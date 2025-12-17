@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STALKER MMO - Zone Map</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #1a1a1a;
+            --secondary-dark: #2d3748;
+            --accent-green: #10b981;
+            --warning-amber: #f59e0b;
+            --danger-red: #ef4444;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --radioactive-green: #39ff14;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--primary-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .map-bg {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d3748 50%, #1a1a1a 100%);
+            position: relative;
+        }
+
+        .map-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('resources/zone_map.png') center/cover;
+            opacity: 0.1;
+            z-index: 0;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 0, 0.02) 2px,
+                rgba(0, 255, 0, 0.02) 4px
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .map-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--secondary-dark);
+            backdrop-filter: blur(5px);
+        }
+
+        .map-container {
+            background: #0a0a0a;
+            border: 2px solid var(--accent-green);
+            position: relative;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+
+        .map-layer-btn {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--text-secondary);
+            color: var(--text-secondary);
+            padding: 4px 8px;
+            margin: 2px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.75rem;
+        }
+
+        .map-layer-btn.active {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.2);
+        }
+
+        .map-layer-btn:hover {
+            border-color: var(--accent-green);
+        }
+
+        .waypoint-marker {
+            background: var(--accent-green);
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 10px var(--accent-green);
+            animation: waypoint-pulse 2s infinite;
+        }
+
+        @keyframes waypoint-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+        }
+
+        .anomaly-marker {
+            background: var(--warning-amber);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 1px solid white;
+            animation: anomaly-flicker 1.5s infinite;
+        }
+
+        @keyframes anomaly-flicker {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        .danger-zone {
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid var(--danger-red);
+            border-radius: 50%;
+            animation: danger-pulse 3s infinite;
+        }
+
+        @keyframes danger-pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.6; }
+        }
+
+        .safe-zone {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid var(--accent-green);
+            border-radius: 4px;
+        }
+
+        .mission-marker {
+            background: var(--warning-amber);
+            width: 16px;
+            height: 16px;
+            transform: rotate(45deg);
+            border: 2px solid white;
+            animation: mission-glow 2s infinite;
+        }
+
+        @keyframes mission-glow {
+            0%, 100% { box-shadow: 0 0 5px var(--warning-amber); }
+            50% { box-shadow: 0 0 15px var(--warning-amber); }
+        }
+
+        .coordinates-display {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 8px 12px;
+            border: 1px solid var(--accent-green);
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--radioactive-green);
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .location-info {
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid var(--accent-green);
+            padding: 12px;
+            border-radius: 4px;
+            max-width: 300px;
+        }
+
+        .distance-indicator {
+            background: var(--accent-green);
+            color: black;
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .squad-member {
+            width: 8px;
+            height: 8px;
+            background: #3b82f6;
+            border: 1px solid white;
+            border-radius: 50%;
+            animation: squad-blink 3s infinite;
+        }
+
+        @keyframes squad-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0;
+            font-size: 0.8rem;
+        }
+
+        .legend-marker {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .route-line {
+            stroke: var(--accent-green);
+            stroke-width: 2;
+            stroke-dasharray: 5, 5;
+            animation: route-flow 2s linear infinite;
+        }
+
+        @keyframes route-flow {
+            0% { stroke-dashoffset: 0; }
+            100% { stroke-dashoffset: 10; }
+        }
+    </style>
+</head>
+<body class="map-bg">
+    <div class="scanlines"></div>
+    
+    <!-- Main Interface -->
+    <div class="h-screen flex p-4 gap-4">
+        <!-- Left Panel - Map Controls -->
+        <div class="map-panel rounded-lg p-4 w-64 fade-in">
+            <div class="orbitron text-lg font-bold mb-4">ZONE MAP</div>
+            
+            <!-- Map Layers -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-2">MAP LAYERS</div>
+                <div class="space-y-1">
+                    <button class="map-layer-btn active w-full text-left" data-layer="satellite">
+                        📡 Satellite View
+                    </button>
+                    <button class="map-layer-btn active w-full text-left" data-layer="anomalies">
+                        ⚠️ Anomalies
+                    </button>
+                    <button class="map-layer-btn active w-full text-left" data-layer="waypoints">
+                        📍 Waypoints
+                    </button>
+                    <button class="map-layer-btn w-full text-left" data-layer="factions">
+                        🏴 Factions
+                    </button>
+                    <button class="map-layer-btn w-full text-left" data-layer="loot">
+                        💎 Loot Locations
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quick Travel -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-2">QUICK TRAVEL</div>
+                <div class="space-y-2">
+                    <button class="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 px-3 rounded text-sm transition-colors">
+                        Cordon Base
+                    </button>
+                    <button class="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 px-3 rounded text-sm transition-colors">
+                        Garbage Outpost
+                    </button>
+                    <button class="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 px-3 rounded text-sm transition-colors">
+                        Agroprom
+                    </button>
+                    <button class="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 px-3 rounded text-sm transition-colors">
+                        Yantar Lab
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mission Objectives -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-2">ACTIVE OBJECTIVES</div>
+                <div class="space-y-2 text-xs">
+                    <div class="bg-gray-800 p-2 rounded border-l-4 border-yellow-500">
+                        <div class="text-yellow-400 font-bold">Retrieve Artifact</div>
+                        <div class="text-gray-400">Red Forest - 2.3km</div>
+                        <div class="distance-indicator mt-1">HIGH RISK</div>
+                    </div>
+                    <div class="bg-gray-800 p-2 rounded border-l-4 border-green-500">
+                        <div class="text-green-400 font-bold">Deliver Supplies</div>
+                        <div class="text-gray-400">Cordon Base - 0.8km</div>
+                        <div class="distance-indicator mt-1">SAFE</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Squad Status -->
+            <div>
+                <div class="text-sm font-bold mb-2">SQUAD STATUS</div>
+                <div class="space-y-2 text-xs">
+                    <div class="flex items-center gap-2">
+                        <div class="squad-member"></div>
+                        <span>Ghost (Leader)</span>
+                        <span class="text-green-400 ml-auto">1.2km</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="squad-member"></div>
+                        <span>Reaper</span>
+                        <span class="text-blue-400 ml-auto">0.5km</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="squad-member"></div>
+                        <span>Doc</span>
+                        <span class="text-yellow-400 ml-auto">2.1km</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Panel - Map -->
+        <div class="flex-1 map-panel rounded-lg p-4 fade-in">
+            <div class="map-container h-full relative">
+                <!-- Simulated Map Content -->
+                <div class="h-full bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
+                    <!-- Grid Overlay -->
+                    <div class="absolute inset-0 opacity-20" style="background-image: linear-gradient(rgba(16, 185, 129, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.1) 1px, transparent 1px); background-size: 50px 50px;"></div>
+                    
+                    <!-- Terrain Features -->
+                    <div class="absolute top-20 left-20 w-32 h-24 bg-gray-700 rounded opacity-60"></div>
+                    <div class="absolute top-40 right-32 w-24 h-32 bg-gray-600 rounded opacity-50"></div>
+                    <div class="absolute bottom-32 left-40 w-40 h-20 bg-gray-800 rounded opacity-70"></div>
+                    
+                    <!-- Anomalies -->
+                    <div class="anomaly-marker absolute top-32 left-64"></div>
+                    <div class="anomaly-marker absolute top-48 right-48"></div>
+                    <div class="anomaly-marker absolute bottom-40 left-80"></div>
+                    
+                    <!-- Danger Zones -->
+                    <div class="danger-zone absolute top-24 left-56 w-24 h-24"></div>
+                    <div class="danger-zone absolute bottom-24 right-40 w-32 h-20"></div>
+                    
+                    <!-- Safe Zones -->
+                    <div class="safe-zone absolute top-16 left-16 w-16 h-12"></div>
+                    <div class="safe-zone absolute bottom-16 right-16 w-20 h-16"></div>
+                    
+                    <!-- Mission Markers -->
+                    <div class="mission-marker absolute top-40 left-80"></div>
+                    <div class="mission-marker absolute bottom-32 right-64"></div>
+                    
+                    <!-- Waypoint (Player Position) -->
+                    <div class="waypoint-marker absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></div>
+                    
+                    <!-- Squad Members -->
+                    <div class="squad-member absolute top-1/3 left-1/4"></div>
+                    <div class="squad-member absolute top-2/3 left-3/4"></div>
+                    
+                    <!-- Route Line (SVG) -->
+                    <svg class="absolute inset-0 w-full h-full pointer-events-none">
+                        <path class="route-line" d="M 50% 50% L 30% 30% L 70% 70%" fill="none"></path>
+                    </svg>
+                </div>
+                
+                <!-- Map Controls -->
+                <div class="map-controls">
+                    <button class="map-layer-btn block mb-1" onclick="zoomIn()">🔍+</button>
+                    <button class="map-layer-btn block" onclick="zoomOut()">🔍-</button>
+                </div>
+                
+                <!-- Coordinates Display -->
+                <div class="coordinates-display">
+                    <div>N48° 09' 15" E29° 15' 42"</div>
+                    <div class="text-xs text-gray-400 mt-1">Zone: Cordon</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Location Info -->
+        <div class="map-panel rounded-lg p-4 w-80 fade-in">
+            <div class="orbitron text-lg font-bold mb-4">LOCATION INFO</div>
+            
+            <!-- Current Location -->
+            <div class="location-info mb-6">
+                <div class="orbitron font-bold text-green-400 mb-2">CURRENT POSITION</div>
+                <div class="text-sm space-y-1">
+                    <div><strong>Zone:</strong> Cordon</div>
+                    <div><strong>Coordinates:</strong> N48° 09' 15" E29° 15' 42"</div>
+                    <div><strong>Radiation:</strong> <span class="text-yellow-400">0.15 μSv/h</span></div>
+                    <div><strong>Threat Level:</strong> <span class="text-green-400">MODERATE</span></div>
+                    <div><strong>Time to Extraction:</strong> 0.8km (12 min)</div>
+                </div>
+            </div>
+
+            <!-- Nearby Locations -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-3">NEARBY LOCATIONS</div>
+                <div class="space-y-2">
+                    <div class="bg-gray-800 p-3 rounded cursor-pointer hover:bg-gray-700 transition-colors">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="font-bold text-yellow-400">Anomaly Field</div>
+                                <div class="text-xs text-gray-400">Electrical anomalies detected</div>
+                            </div>
+                            <div class="distance-indicator">240m</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 p-3 rounded cursor-pointer hover:bg-gray-700 transition-colors">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="font-bold text-green-400">Stalker Camp</div>
+                                <div class="text-xs text-gray-400">Safe zone - Trading available</div>
+                            </div>
+                            <div class="distance-indicator">480m</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 p-3 rounded cursor-pointer hover:bg-gray-700 transition-colors">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="font-bold text-red-400">Military Outpost</div>
+                                <div class="text-xs text-gray-400">Hostile faction territory</div>
+                            </div>
+                            <div class="distance-indicator">1.2km</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map Legend -->
+            <div>
+                <div class="text-sm font-bold mb-3">MAP LEGEND</div>
+                <div class="space-y-1 text-xs">
+                    <div class="legend-item">
+                        <div class="legend-marker bg-green-500 rounded-full"></div>
+                        <span>Player Position</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-marker bg-blue-500 rounded-full"></div>
+                        <span>Squad Members</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-marker bg-yellow-500"></div>
+                        <span>Mission Objectives</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-marker bg-orange-500 rounded-full"></div>
+                        <span>Anomalies</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-marker bg-red-500 rounded-full"></div>
+                        <span>Danger Zones</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-marker bg-green-600"></div>
+                        <span>Safe Zones</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="absolute top-4 left-4 fade-in">
+        <button onclick="window.location.href='index.html'" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm transition-colors">
+            ← BACK TO MENU
+        </button>
+    </div>
+
+    <script>
+        let mapZoom = 1;
+        let waypoints = [];
+        let currentPosition = { x: 50, y: 50 }; // Percentage coordinates
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize animations
+            anime({
+                targets: '.fade-in',
+                opacity: [0, 1],
+                translateY: [20, 0],
+                duration: 1000,
+                delay: anime.stagger(100),
+                easing: 'easeOutQuart'
+            });
+
+            setupMapLayers();
+            setupMapInteractions();
+            updateCoordinates();
+        });
+
+        function setupMapLayers() {
+            const layerButtons = document.querySelectorAll('.map-layer-btn[data-layer]');
+            
+            layerButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const layer = button.dataset.layer;
+                    button.classList.toggle('active');
+                    
+                    // In a real implementation, this would toggle map layers
+                    toggleMapLayer(layer, button.classList.contains('active'));
+                });
+            });
+        }
+
+        function toggleMapLayer(layer, visible) {
+            const layerElements = {
+                'anomalies': '.anomaly-marker',
+                'waypoints': '.waypoint-marker',
+                'factions': '.faction-marker',
+                'loot': '.loot-marker'
+            };
+
+            if (layerElements[layer]) {
+                const elements = document.querySelectorAll(layerElements[layer]);
+                elements.forEach(el => {
+                    el.style.display = visible ? 'block' : 'none';
+                });
+            }
+        }
+
+        function setupMapInteractions() {
+            const mapContainer = document.querySelector('.map-container');
+            
+            // Click to set waypoint
+            mapContainer.addEventListener('click', (e) => {
+                const rect = mapContainer.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                
+                addWaypoint(x, y);
+            });
+
+            // Hover for coordinates
+            mapContainer.addEventListener('mousemove', (e) => {
+                const rect = mapContainer.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                
+                updateCoordinateDisplay(x, y);
+            });
+        }
+
+        function addWaypoint(x, y) {
+            // Remove existing waypoints
+            const existingWaypoints = document.querySelectorAll('.user-waypoint');
+            existingWaypoints.forEach(wp => wp.remove());
+
+            // Add new waypoint
+            const waypoint = document.createElement('div');
+            waypoint.className = 'user-waypoint absolute w-3 h-3 bg-blue-500 border-2 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2';
+            waypoint.style.left = x + '%';
+            waypoint.style.top = y + '%';
+            waypoint.style.animation = 'waypoint-pulse 2s infinite';
+            
+            document.querySelector('.map-container > div').appendChild(waypoint);
+            
+            // Calculate distance
+            const distance = calculateDistance(currentPosition.x, currentPosition.y, x, y);
+            showNotification('WAYPOINT SET', `Distance: ${distance.toFixed(1)}km`);
+            
+            waypoints.push({ x, y, distance });
+        }
+
+        function calculateDistance(x1, y1, x2, y2) {
+            // Simple distance calculation (in real game, this would be more complex)
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            return Math.sqrt(dx * dx + dy * dy) * 0.1; // Scale to kilometers
+        }
+
+        function updateCoordinateDisplay(x, y) {
+            const lat = 48 + (x / 100 * 0.5);
+            const lon = 29 + (y / 100 * 0.5);
+            
+            const latString = `N${Math.floor(lat)}° ${Math.floor((lat % 1) * 60)}' ${Math.floor(((lat % 1) * 60 % 1) * 60)}"`;
+            const lonString = `E${Math.floor(lon)}° ${Math.floor((lon % 1) * 60)}' ${Math.floor(((lon % 1) * 60 % 1) * 60)}"`;
+            
+            document.querySelector('.coordinates-display').innerHTML = `
+                <div>${latString} ${lonString}</div>
+                <div class="text-xs text-gray-400 mt-1">Zone: Cordon</div>
+            `;
+        }
+
+        function updateCoordinates() {
+            // Simulate player movement
+            setInterval(() => {
+                currentPosition.x += (Math.random() - 0.5) * 0.1;
+                currentPosition.y += (Math.random() - 0.5) * 0.1;
+                
+                // Keep within bounds
+                currentPosition.x = Math.max(5, Math.min(95, currentPosition.x));
+                currentPosition.y = Math.max(5, Math.min(95, currentPosition.y));
+                
+                // Update waypoint marker position
+                const waypoint = document.querySelector('.waypoint-marker');
+                if (waypoint) {
+                    waypoint.style.left = currentPosition.x + '%';
+                    waypoint.style.top = currentPosition.y + '%';
+                }
+            }, 5000);
+        }
+
+        function zoomIn() {
+            mapZoom = Math.min(3, mapZoom + 0.5);
+            applyZoom();
+        }
+
+        function zoomOut() {
+            mapZoom = Math.max(0.5, mapZoom - 0.5);
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const mapContent = document.querySelector('.map-container > div');
+            mapContent.style.transform = `scale(${mapZoom})`;
+            mapContent.style.transformOrigin = 'center center';
+        }
+
+        function showNotification(title, message) {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-black border-l-4 border-green-500 p-4 text-white z-50 transform translate-x-full transition-transform duration-300';
+            notification.innerHTML = `
+                <div class="font-bold text-green-400">${title}</div>
+                <div class="text-sm text-gray-400">${message}</div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+            }, 100);
+            
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case '+':
+                case '=':
+                    zoomIn();
+                    break;
+                case '-':
+                    zoomOut();
+                    break;
+                case 'Escape':
+                    window.location.href = 'index.html';
+                    break;
+            }
+        });
+
+        // Simulate squad movement
+        setInterval(() => {
+            const squadMembers = document.querySelectorAll('.squad-member');
+            squadMembers.forEach(member => {
+                const currentLeft = parseFloat(member.style.left) || 25;
+                const currentTop = parseFloat(member.style.top) || 33;
+                
+                const newLeft = currentLeft + (Math.random() - 0.5) * 2;
+                const newTop = currentTop + (Math.random() - 0.5) * 2;
+                
+                member.style.left = Math.max(5, Math.min(95, newLeft)) + '%';
+                member.style.top = Math.max(5, Math.min(95, newTop)) + '%';
+            });
+        }, 3000);
+
+        // Simulate anomaly activity
+        setInterval(() => {
+            const anomalies = document.querySelectorAll('.anomaly-marker');
+            anomalies.forEach(anomaly => {
+                if (Math.random() < 0.3) {
+                    anomaly.style.animation = 'none';
+                    setTimeout(() => {
+                        anomaly.style.animation = 'anomaly-flicker 1.5s infinite';
+                    }, 100);
+                }
+            });
+        }, 2000);
+    </script>
+</body>
+</html>

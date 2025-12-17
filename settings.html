@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STALKER MMO - Settings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #1a1a1a;
+            --secondary-dark: #2d3748;
+            --accent-green: #10b981;
+            --warning-amber: #f59e0b;
+            --danger-red: #ef4444;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --radioactive-green: #39ff14;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--primary-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .settings-bg {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d3748 50%, #1a1a1a 100%);
+            position: relative;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 0, 0.02) 2px,
+                rgba(0, 255, 0, 0.02) 4px
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .settings-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--secondary-dark);
+            backdrop-filter: blur(5px);
+        }
+
+        .settings-tab {
+            background: rgba(45, 55, 72, 0.8);
+            border: 1px solid var(--secondary-dark);
+            color: var(--text-secondary);
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .settings-tab.active {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: var(--accent-green);
+            color: var(--text-primary);
+        }
+
+        .settings-tab:hover {
+            border-color: var(--accent-green);
+        }
+
+        .setting-item {
+            background: rgba(45, 55, 72, 0.6);
+            border: 1px solid var(--secondary-dark);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 8px 0;
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--secondary-dark);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--secondary-dark);
+            transition: 0.3s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--accent-green);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+
+        .keybind-input {
+            background: var(--secondary-dark);
+            border: 1px solid var(--text-secondary);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .keybind-input:hover {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .keybind-input.active {
+            border-color: var(--warning-amber);
+            background: rgba(245, 158, 11, 0.1);
+            animation: keybind-pulse 1s infinite;
+        }
+
+        @keyframes keybind-pulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(245, 158, 11, 0.3); }
+            50% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.6); }
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .preview-area {
+            background: var(--secondary-dark);
+            border: 1px solid var(--text-secondary);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            min-height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .performance-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .performance-excellent { background: var(--accent-green); color: black; }
+        .performance-good { background: var(--warning-amber); color: black; }
+        .performance-poor { background: var(--danger-red); color: white; }
+
+        .reset-button {
+            background: var(--danger-red);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .reset-button:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        .apply-button {
+            background: var(--accent-green);
+            color: black;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: bold;
+        }
+
+        .apply-button:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body class="settings-bg">
+    <div class="scanlines"></div>
+    
+    <!-- Main Interface -->
+    <div class="h-screen flex p-4 gap-4">
+        <!-- Left Panel - Settings Categories -->
+        <div class="settings-panel rounded-lg p-4 w-64 fade-in">
+            <div class="orbitron text-lg font-bold mb-4">SETTINGS</div>
+            
+            <div class="space-y-2">
+                <button class="settings-tab active w-full text-left" data-tab="graphics">
+                    🎮 GRAPHICS
+                </button>
+                <button class="settings-tab w-full text-left" data-tab="audio">
+                    🔊 AUDIO
+                </button>
+                <button class="settings-tab w-full text-left" data-tab="controls">
+                    ⌨️ CONTROLS
+                </button>
+                <button class="settings-tab w-full text-left" data-tab="gameplay">
+                    ⚙️ GAMEPLAY
+                </button>
+                <button class="settings-tab w-full text-left" data-tab="interface">
+                    🖥️ INTERFACE
+                </button>
+                <button class="settings-tab w-full text-left" data-tab="account">
+                    👤 ACCOUNT
+                </button>
+            </div>
+
+            <!-- System Info -->
+            <div class="mt-8">
+                <div class="text-sm font-bold mb-3">SYSTEM INFO</div>
+                <div class="text-xs space-y-1">
+                    <div class="flex justify-between">
+                        <span>Resolution:</span>
+                        <span class="text-green-400">1920x1080</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>FPS:</span>
+                        <span class="performance-indicator performance-excellent">144</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Ping:</span>
+                        <span class="text-green-400">24ms</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Server:</span>
+                        <span class="text-blue-400">Chernobyl-1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-8 space-y-2">
+                <button class="apply-button w-full" onclick="applySettings()">
+                    APPLY SETTINGS
+                </button>
+                <button class="reset-button w-full" onclick="resetSettings()">
+                    RESET TO DEFAULT
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Panel - Settings Content -->
+        <div class="flex-1 settings-panel rounded-lg p-4 fade-in">
+            <!-- Graphics Tab -->
+            <div id="graphics-tab" class="tab-content">
+                <div class="orbitron text-lg font-bold mb-4">GRAPHICS SETTINGS</div>
+                
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Graphics Quality</span>
+                                <select class="bg-gray-700 text-white px-3 py-1 rounded text-sm">
+                                    <option>Ultra</option>
+                                    <option>High</option>
+                                    <option>Medium</option>
+                                    <option>Low</option>
+                                </select>
+                            </div>
+                            <div class="text-xs text-gray-400">Overall graphics quality preset</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Resolution</span>
+                                <select class="bg-gray-700 text-white px-3 py-1 rounded text-sm">
+                                    <option>1920x1080</option>
+                                    <option>2560x1440</option>
+                                    <option>3840x2160</option>
+                                    <option>1280x720</option>
+                                </select>
+                            </div>
+                            <div class="text-xs text-gray-400">Screen resolution</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Display Mode</span>
+                                <select class="bg-gray-700 text-white px-3 py-1 rounded text-sm">
+                                    <option>Fullscreen</option>
+                                    <option>Windowed</option>
+                                    <option>Borderless</option>
+                                </select>
+                            </div>
+                            <div class="text-xs text-gray-400">Window display mode</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">V-Sync</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Vertical synchronization</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="setting-item">
+                            <div class="font-bold mb-3">Field of View</div>
+                            <input type="range" class="slider" min="70" max="120" value="90">
+                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>70°</span>
+                                <span>90°</span>
+                                <span>120°</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="font-bold mb-3">Brightness</div>
+                            <input type="range" class="slider" min="0" max="100" value="50">
+                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>Dark</span>
+                                <span>Bright</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="font-bold mb-3">Contrast</div>
+                            <input type="range" class="slider" min="0" max="100" value="50">
+                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>Low</span>
+                                <span>High</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">HDR</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">High Dynamic Range rendering</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Area -->
+                <div class="mt-6">
+                    <div class="font-bold mb-2">Preview</div>
+                    <div class="preview-area">
+                        <div class="text-green-400">
+                            <div class="text-lg mb-2">🎮</div>
+                            <div>Graphics settings will apply on next launch</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audio Tab -->
+            <div id="audio-tab" class="tab-content hidden">
+                <div class="orbitron text-lg font-bold mb-4">AUDIO SETTINGS</div>
+                
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <div class="setting-item">
+                            <div class="font-bold mb-3">Master Volume</div>
+                            <input type="range" class="slider" min="0" max="100" value="75">
+                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>0%</span>
+                                <span>75%</span>
+                                <span>100%</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="font-bold mb-3">SFX Volume</div>
+                            <input type="range" class="slider" min="0" max="100" value="80">
+                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>0%</span>
+                                <span>80%</span>
+                                <span>100%</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="font-bold mb-3">Music Volume</div>
+                            <input type="range" class="slider" min="0" max="100" value="60">
+                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>0%</span>
+                                <span>60%</span>
+                                <span>100%</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="font-bold mb-3">Voice Volume</div>
+                            <input type="range" class="slider" min="0" max="100" value="85">
+                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>0%</span>
+                                <span>85%</span>
+                                <span>100%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Audio Quality</span>
+                                <select class="bg-gray-700 text-white px-3 py-1 rounded text-sm">
+                                    <option>High</option>
+                                    <option>Medium</option>
+                                    <option>Low</option>
+                                </select>
+                            </div>
+                            <div class="text-xs text-gray-400">Audio quality preset</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">3D Audio</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Spatial audio positioning</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Radio Filter</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Radio communication effects</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Geiger Sounds</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Radiation detection audio</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audio Test -->
+                <div class="mt-6">
+                    <div class="font-bold mb-2">Audio Test</div>
+                    <div class="preview-area">
+                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors">
+                            🔊 TEST AUDIO
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls Tab -->
+            <div id="controls-tab" class="tab-content hidden">
+                <div class="orbitron text-lg font-bold mb-4">CONTROL SETTINGS</div>
+                
+                <div class="setting-item">
+                    <div class="text-sm font-bold mb-3">MOVEMENT</div>
+                    <div class="grid grid-cols-3 gap-4 text-xs">
+                        <div class="flex justify-between items-center">
+                            <span>Forward</span>
+                            <div class="keybind-input" data-action="move-forward">W</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Backward</span>
+                            <div class="keybind-input" data-action="move-backward">S</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Left</span>
+                            <div class="keybind-input" data-action="move-left">A</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Right</span>
+                            <div class="keybind-input" data-action="move-right">D</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Jump</span>
+                            <div class="keybind-input" data-action="jump">SPACE</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Crouch</span>
+                            <div class="keybind-input" data-action="crouch">CTRL</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="text-sm font-bold mb-3">COMBAT</div>
+                    <div class="grid grid-cols-3 gap-4 text-xs">
+                        <div class="flex justify-between items-center">
+                            <span>Fire</span>
+                            <div class="keybind-input" data-action="fire">MOUSE1</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Aim</span>
+                            <div class="keybind-input" data-action="aim">MOUSE2</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Reload</span>
+                            <div class="keybind-input" data-action="reload">R</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Weapon 1</span>
+                            <div class="keybind-input" data-action="weapon-1">1</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Weapon 2</span>
+                            <div class="keybind-input" data-action="weapon-2">2</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Weapon 3</span>
+                            <div class="keybind-input" data-action="weapon-3">3</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="text-sm font-bold mb-3">INTERFACE</div>
+                    <div class="grid grid-cols-3 gap-4 text-xs">
+                        <div class="flex justify-between items-center">
+                            <span>Inventory</span>
+                            <div class="keybind-input" data-action="inventory">TAB</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Map</span>
+                            <div class="keybind-input" data-action="map">M</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Flashlight</span>
+                            <div class="keybind-input" data-action="flashlight">F</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Radio</span>
+                            <div class="keybind-input" data-action="radio">V</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Detector</span>
+                            <div class="keybind-input" data-action="detector">G</div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>PDA</span>
+                            <div class="keybind-input" data-action="pda">P</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gameplay Tab -->
+            <div id="gameplay-tab" class="tab-content hidden">
+                <div class="orbitron text-lg font-bold mb-4">GAMEPLAY SETTINGS</div>
+                
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Difficulty</span>
+                                <select class="bg-gray-700 text-white px-3 py-1 rounded text-sm">
+                                    <option>Rookie</option>
+                                    <option>Stalker</option>
+                                    <option>Veteran</option>
+                                    <option>Master</option>
+                                </select>
+                            </div>
+                            <div class="text-xs text-gray-400">Game difficulty level</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Hardcore Mode</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Permadeath and realistic mechanics</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Auto-Save</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Automatic game saving</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Crosshair</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Display aiming crosshair</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Weapon Bob</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Weapon movement while walking</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">HUD Elements</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Display HUD interface</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Subtitles</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Display dialogue subtitles</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Tutorial Tips</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Show helpful game tips</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interface Tab -->
+            <div id="interface-tab" class="tab-content hidden">
+                <div class="orbitron text-lg font-bold mb-4">INTERFACE SETTINGS</div>
+                
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <div class="setting-item">
+                            <div class="font-bold mb-3">HUD Scale</div>
+                            <input type="range" class="slider" min="50" max="150" value="100">
+                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>50%</span>
+                                <span>100%</span>
+                                <span>150%</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="font-bold mb-3">Chat Size</div>
+                            <input type="range" class="slider" min="50" max="150" value="100">
+                            <div class="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>50%</span>
+                                <span>100%</span>
+                                <span>150%</span>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Minimap</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Display minimap</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Damage Numbers</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Show damage dealt</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Color Scheme</span>
+                                <select class="bg-gray-700 text-white px-3 py-1 rounded text-sm">
+                                    <option>Default</option>
+                                    <option>High Contrast</option>
+                                    <option>Color Blind</option>
+                                    <option>Minimal</option>
+                                </select>
+                            </div>
+                            <div class="text-xs text-gray-400">UI color scheme</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Animations</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">UI transition animations</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Tooltips</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Show item tooltips</div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold">Performance Stats</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-400">Display FPS and ping</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Tab -->
+            <div id="account-tab" class="tab-content hidden">
+                <div class="orbitron text-lg font-bold mb-4">ACCOUNT SETTINGS</div>
+                
+                <div class="setting-item">
+                    <div class="text-sm font-bold mb-3">PROFILE INFORMATION</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Username</label>
+                            <input type="text" value="STALKER_47" class="w-full bg-gray-700 text-white px-3 py-2 rounded text-sm border border-gray-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Email</label>
+                            <input type="email" value="stalker@zone.com" class="w-full bg-gray-700 text-white px-3 py-2 rounded text-sm border border-gray-600">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="text-sm font-bold mb-3">PRIVACY SETTINGS</div>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm">Show online status</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm">Allow friend requests</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm">Share location with squad</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm">Data collection for analytics</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="text-sm font-bold mb-3">SECURITY</div>
+                    <div class="space-y-3">
+                        <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded text-sm transition-colors">
+                            Change Password
+                        </button>
+                        <button class="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded text-sm transition-colors">
+                            Enable Two-Factor Auth
+                        </button>
+                        <button class="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded text-sm transition-colors">
+                            Delete Account
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Settings Info -->
+        <div class="settings-panel rounded-lg p-4 w-80 fade-in">
+            <div class="orbitron text-lg font-bold mb-4">SETTINGS INFO</div>
+            
+            <div id="settings-info">
+                <div class="text-center text-gray-500 py-8">
+                    Select a setting to view details
+                </div>
+            </div>
+
+            <!-- Performance Impact -->
+            <div class="mt-6">
+                <div class="text-sm font-bold mb-3">PERFORMANCE IMPACT</div>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs">Graphics Quality</span>
+                        <span class="performance-indicator performance-excellent">LOW</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs">Resolution</span>
+                        <span class="performance-indicator performance-good">MEDIUM</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs">V-Sync</span>
+                        <span class="performance-indicator performance-poor">HIGH</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs">HDR</span>
+                        <span class="performance-indicator performance-poor">HIGH</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recommendations -->
+            <div class="mt-6">
+                <div class="text-sm font-bold mb-3">RECOMMENDATIONS</div>
+                <div class="space-y-2 text-xs">
+                    <div class="bg-green-800 p-2 rounded border-l-4 border-green-500">
+                        <div class="text-green-400 font-bold">Performance Boost</div>
+                        <div class="text-gray-400">Disable V-Sync for +15 FPS</div>
+                    </div>
+                    <div class="bg-yellow-800 p-2 rounded border-l-4 border-yellow-500">
+                        <div class="text-yellow-400 font-bold">Visual Quality</div>
+                        <div class="text-gray-400">Enable HDR for better lighting</div>
+                    </div>
+                    <div class="bg-blue-800 p-2 rounded border-l-4 border-blue-500">
+                        <div class="text-blue-400 font-bold">Audio Enhancement</div>
+                        <div class="text-gray-400">Use 3D Audio for immersion</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="absolute top-4 left-4 fade-in">
+        <button onclick="window.location.href='index.html'" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm transition-colors">
+            ← BACK TO MENU
+        </button>
+    </div>
+
+    <script>
+        let activeKeybind = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize animations
+            anime({
+                targets: '.fade-in',
+                opacity: [0, 1],
+                translateY: [20, 0],
+                duration: 1000,
+                delay: anime.stagger(100),
+                easing: 'easeOutQuart'
+            });
+
+            setupSettingsTabs();
+            setupKeybindInputs();
+            setupSliders();
+        });
+
+        function setupSettingsTabs() {
+            const tabs = document.querySelectorAll('.settings-tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const targetTab = tab.dataset.tab;
+                    
+                    // Update tab states
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    
+                    // Update content visibility
+                    tabContents.forEach(content => {
+                        if (content.id === `${targetTab}-tab`) {
+                            content.classList.remove('hidden');
+                        } else {
+                            content.classList.add('hidden');
+                        }
+                    });
+
+                    // Update settings info
+                    updateSettingsInfo(targetTab);
+                });
+            });
+        }
+
+        function setupKeybindInputs() {
+            const keybindInputs = document.querySelectorAll('.keybind-input');
+            
+            keybindInputs.forEach(input => {
+                input.addEventListener('click', () => {
+                    // Remove active class from all keybinds
+                    keybindInputs.forEach(k => k.classList.remove('active'));
+                    
+                    // Add active class to clicked keybind
+                    input.classList.add('active');
+                    activeKeybind = input;
+                    
+                    showNotification('KEYBIND SETUP', 'Press any key to assign...');
+                });
+            });
+        }
+
+        function setupSliders() {
+            const sliders = document.querySelectorAll('.slider');
+            
+            sliders.forEach(slider => {
+                slider.addEventListener('input', (e) => {
+                    const value = e.target.value;
+                    const min = e.target.min;
+                    const max = e.target.max;
+                    
+                    // Update visual feedback based on value
+                    const percentage = ((value - min) / (max - min)) * 100;
+                    e.target.style.background = `linear-gradient(90deg, var(--accent-green) 0%, var(--accent-green) ${percentage}%, var(--secondary-dark) ${percentage}%, var(--secondary-dark) 100%)`;
+                });
+            });
+        }
+
+        function updateSettingsInfo(tabName) {
+            const infoPanel = document.getElementById('settings-info');
+            const infoData = {
+                'graphics': {
+                    title: 'GRAPHICS SETTINGS',
+                    description: 'Adjust visual quality and performance settings. Higher settings provide better visuals but may impact performance.',
+                    tips: [
+                        'Lower graphics quality for better FPS',
+                        'Disable V-Sync to reduce input lag',
+                        'Use borderless window for faster alt-tabbing'
+                    ]
+                },
+                'audio': {
+                    title: 'AUDIO SETTINGS',
+                    description: 'Configure sound levels and audio effects. 3D audio enhances spatial awareness in the Zone.',
+                    tips: [
+                        'Use headphones for best 3D audio experience',
+                        'Adjust voice volume for clear squad communication',
+                        'Radio filter adds immersion to communications'
+                    ]
+                },
+                'controls': {
+                    title: 'CONTROL SETTINGS',
+                    description: 'Customize keyboard and mouse controls. Click any keybind to change it.',
+                    tips: [
+                        'Use comfortable keybindings for long sessions',
+                        'Keep movement keys on left hand',
+                        'Assign important actions to easy-to-reach keys'
+                    ]
+                },
+                'gameplay': {
+                    title: 'GAMEPLAY SETTINGS',
+                    description: 'Adjust game mechanics and difficulty. Hardcore mode provides the ultimate survival challenge.',
+                    tips: [
+                        'Hardcore mode enables permadeath',
+                        'Auto-save prevents progress loss',
+                        'Tutorial tips help new players'
+                    ]
+                },
+                'interface': {
+                    title: 'INTERFACE SETTINGS',
+                    description: 'Customize HUD elements and visual interface. Adjust for accessibility and personal preference.',
+                    tips: [
+                        'Increase HUD scale for better visibility',
+                        'Color blind mode improves accessibility',
+                        'Performance stats help monitor system health'
+                    ]
+                },
+                'account': {
+                    title: 'ACCOUNT SETTINGS',
+                    description: 'Manage your account information and privacy settings. Keep your profile secure.',
+                    tips: [
+                        'Enable two-factor authentication for security',
+                        'Regularly update your password',
+                        'Review privacy settings periodically'
+                    ]
+                }
+            };
+
+            const info = infoData[tabName];
+            if (info) {
+                infoPanel.innerHTML = `
+                    <div class="mb-4">
+                        <div class="font-bold text-green-400 mb-2">${info.title}</div>
+                        <div class="text-xs text-gray-400 mb-4">${info.description}</div>
+                        <div class="text-xs font-bold mb-2">TIPS:</div>
+                        <ul class="text-xs text-gray-400 space-y-1">
+                            ${info.tips.map(tip => `<li>• ${tip}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+        }
+
+        function applySettings() {
+            // Simulate settings application
+            showNotification('SETTINGS APPLIED', 'Your settings have been saved successfully!');
+            
+            // Animate apply button
+            const applyBtn = document.querySelector('.apply-button');
+            anime({
+                targets: applyBtn,
+                scale: [1, 0.95, 1],
+                duration: 200,
+                easing: 'easeOutQuad'
+            });
+        }
+
+        function resetSettings() {
+            if (confirm('Are you sure you want to reset all settings to default? This action cannot be undone.')) {
+                // Reset all sliders to default values
+                const sliders = document.querySelectorAll('.slider');
+                sliders.forEach(slider => {
+                    const defaultValue = slider.defaultValue || 50;
+                    slider.value = defaultValue;
+                });
+
+                // Reset all toggles to default
+                const toggles = document.querySelectorAll('.toggle-switch input');
+                toggles.forEach(toggle => {
+                    toggle.checked = toggle.defaultChecked || false;
+                });
+
+                showNotification('SETTINGS RESET', 'All settings have been reset to default values.');
+            }
+        }
+
+        function showNotification(title, message) {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-black border-l-4 border-green-500 p-4 text-white z-50 transform translate-x-full transition-transform duration-300';
+            notification.innerHTML = `
+                <div class="font-bold text-green-400">${title}</div>
+                <div class="text-sm text-gray-400">${message}</div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+            }, 100);
+            
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // Global key event listener for keybind setup
+        document.addEventListener('keydown', (e) => {
+            if (activeKeybind) {
+                e.preventDefault();
+                const key = e.key.toUpperCase();
+                activeKeybind.textContent = key;
+                activeKeybind.classList.remove('active');
+                activeKeybind = null;
+                showNotification('KEYBIND SET', `Key assigned: ${key}`);
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (activeKeybind) {
+                    activeKeybind.classList.remove('active');
+                    activeKeybind = null;
+                } else {
+                    window.location.href = 'index.html';
+                }
+            }
+        });
+
+        // Initialize with first tab info
+        updateSettingsInfo('graphics');
+    </script>
+</body>
+</html>

@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STALKER MMO - Character Progression</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #1a1a1a;
+            --secondary-dark: #2d3748;
+            --accent-green: #10b981;
+            --warning-amber: #f59e0b;
+            --danger-red: #ef4444;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --radioactive-green: #39ff14;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--primary-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .character-bg {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d3748 50%, #1a1a1a 100%);
+            position: relative;
+        }
+
+        .character-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('resources/skill_tree.png') center/cover;
+            opacity: 0.1;
+            z-index: 0;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 0, 0.02) 2px,
+                rgba(0, 255, 0, 0.02) 4px
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .character-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--secondary-dark);
+            backdrop-filter: blur(5px);
+        }
+
+        .skill-node {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid var(--text-secondary);
+            background: rgba(45, 55, 72, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .skill-node:hover {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+            transform: scale(1.1);
+        }
+
+        .skill-node.unlocked {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.2);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .skill-node.available {
+            border-color: var(--warning-amber);
+            background: rgba(245, 158, 11, 0.2);
+            animation: skill-pulse 2s infinite;
+        }
+
+        @keyframes skill-pulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(245, 158, 11, 0.3); }
+            50% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.6); }
+        }
+
+        .skill-connection {
+            stroke: var(--text-secondary);
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .skill-connection.active {
+            stroke: var(--accent-green);
+            stroke-width: 3;
+            filter: drop-shadow(0 0 3px var(--accent-green));
+        }
+
+        .skill-tree {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+        }
+
+        .perk-card {
+            background: rgba(45, 55, 72, 0.8);
+            border: 1px solid var(--secondary-dark);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .perk-card:hover {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .perk-card.selected {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.2);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+        }
+
+        .perk-card.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .stat-bar {
+            height: 8px;
+            background: var(--secondary-dark);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .stat-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--danger-red), var(--warning-amber), var(--accent-green));
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .stat-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: stat-scan 2s infinite;
+        }
+
+        @keyframes stat-scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .character-avatar {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, var(--secondary-dark), var(--primary-dark));
+            border: 3px solid var(--accent-green);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            margin: 0 auto 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .character-avatar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.2), transparent);
+            animation: avatar-scan 3s infinite;
+        }
+
+        @keyframes avatar-scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .level-indicator {
+            background: var(--accent-green);
+            color: black;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .skill-points {
+            background: var(--warning-amber);
+            color: black;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .reputation-bar {
+            height: 4px;
+            background: var(--secondary-dark);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .reputation-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .reputation-neutral { background: var(--text-secondary); }
+        .reputation-friendly { background: var(--accent-green); }
+        .reputation-hostile { background: var(--danger-red); }
+        .reputation-wary { background: var(--warning-amber); }
+
+        .achievement-badge {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid var(--warning-amber);
+            background: rgba(245, 158, 11, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .achievement-badge:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+        }
+
+        .achievement-badge.locked {
+            border-color: var(--text-secondary);
+            background: rgba(156, 163, 175, 0.2);
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body class="character-bg">
+    <div class="scanlines"></div>
+    
+    <!-- Main Interface -->
+    <div class="h-screen flex p-4 gap-4">
+        <!-- Left Panel - Character Info -->
+        <div class="character-panel rounded-lg p-4 w-64 fade-in">
+            <div class="orbitron text-lg font-bold mb-4">CHARACTER</div>
+            
+            <!-- Character Avatar -->
+            <div class="character-avatar">
+                <span>👤</span>
+            </div>
+            
+            <!-- Basic Info -->
+            <div class="text-center mb-6">
+                <div class="orbitron text-xl font-bold mb-1">STALKER_47</div>
+                <div class="text-sm text-gray-400 mb-2">Veteran Survivor</div>
+                <div class="flex justify-center gap-2">
+                    <span class="level-indicator">LVL 23</span>
+                    <span class="skill-points">SP: 5</span>
+                </div>
+            </div>
+
+            <!-- Core Stats -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-3">CORE STATS</div>
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>MARKSMANSHIP</span>
+                            <span>67/100</span>
+                        </div>
+                        <div class="stat-bar">
+                            <div class="stat-fill" style="width: 67%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>SURVIVAL</span>
+                            <span>84/100</span>
+                        </div>
+                        <div class="stat-bar">
+                            <div class="stat-fill" style="width: 84%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>ENDURANCE</span>
+                            <span>52/100</span>
+                        </div>
+                        <div class="stat-bar">
+                            <div class="stat-fill" style="width: 52%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>TECHNICAL</span>
+                            <span>73/100</span>
+                        </div>
+                        <div class="stat-bar">
+                            <div class="stat-fill" style="width: 73%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reputation -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-3">FACTION REPUTATION</div>
+                <div class="space-y-2 text-xs">
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span>Duty</span>
+                            <span class="text-green-400">Friendly</span>
+                        </div>
+                        <div class="reputation-bar">
+                            <div class="reputation-fill reputation-friendly" style="width: 75%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span>Freedom</span>
+                            <span class="text-yellow-400">Wary</span>
+                        </div>
+                        <div class="reputation-bar">
+                            <div class="reputation-fill reputation-wary" style="width: 35%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span>Bandits</span>
+                            <span class="text-red-400">Hostile</span>
+                        </div>
+                        <div class="reputation-bar">
+                            <div class="reputation-fill reputation-hostile" style="width: 15%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span>Scientists</span>
+                            <span class="text-green-400">Friendly</span>
+                        </div>
+                        <div class="reputation-bar">
+                            <div class="reputation-fill reputation-friendly" style="width: 80%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Achievements -->
+            <div>
+                <div class="text-sm font-bold mb-3">RECENT ACHIEVEMENTS</div>
+                <div class="grid grid-cols-4 gap-2">
+                    <div class="achievement-badge" title="First Blood">
+                        <span class="text-xs">🩸</span>
+                    </div>
+                    <div class="achievement-badge" title="Artifact Hunter">
+                        <span class="text-xs">💎</span>
+                    </div>
+                    <div class="achievement-badge" title="Master Technician">
+                        <span class="text-xs">🔧</span>
+                    </div>
+                    <div class="achievement-badge locked" title="Zone Legend (Locked)">
+                        <span class="text-xs">🏆</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Panel - Skill Tree -->
+        <div class="flex-1 character-panel rounded-lg p-4 fade-in">
+            <div class="flex justify-between items-center mb-4">
+                <div class="orbitron text-lg font-bold">SKILL TREE</div>
+                <div class="flex gap-2">
+                    <button class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm transition-colors">
+                        COMBAT
+                    </button>
+                    <button class="bg-green-600 text-white px-3 py-1 rounded text-sm">
+                        SURVIVAL
+                    </button>
+                    <button class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm transition-colors">
+                        TECHNICAL
+                    </button>
+                </div>
+            </div>
+
+            <!-- Skill Tree Visualization -->
+            <div class="skill-tree">
+                <svg width="100%" height="100%" class="absolute inset-0">
+                    <!-- Skill Connections -->
+                    <path class="skill-connection active" d="M 150 100 L 250 150"></path>
+                    <path class="skill-connection active" d="M 250 150 L 350 100"></path>
+                    <path class="skill-connection" d="M 250 150 L 350 200"></path>
+                    <path class="skill-connection active" d="M 350 100 L 450 150"></path>
+                    <path class="skill-connection" d="M 350 200 L 450 250"></path>
+                    <path class="skill-connection" d="M 450 150 L 550 200"></path>
+                    <path class="skill-connection" d="M 450 250 L 550 300"></path>
+                    <path class="skill-connection active" d="M 550 200 L 650 250"></path>
+                    <path class="skill-connection" d="M 550 300 L 650 350"></path>
+                </svg>
+
+                <!-- Skill Nodes -->
+                <div class="skill-node unlocked" style="position: absolute; top: 70px; left: 120px;" data-skill="basic-survival">
+                    <span class="text-lg">🏕️</span>
+                </div>
+                <div class="skill-node unlocked" style="position: absolute; top: 120px; left: 220px;" data-skill="foraging">
+                    <span class="text-lg">🌿</span>
+                </div>
+                <div class="skill-node unlocked" style="position: absolute; top: 70px; left: 320px;" data-skill="animal-tracking">
+                    <span class="text-lg">👣</span>
+                </div>
+                <div class="skill-node available" style="position: absolute; top: 170px; left: 320px;" data-skill="weather-resistance">
+                    <span class="text-lg">🌧️</span>
+                </div>
+                <div class="skill-node unlocked" style="position: absolute; top: 120px; left: 420px;" data-skill="advanced-camping">
+                    <span class="text-lg">⛺</span>
+                </div>
+                <div class="skill-node available" style="position: absolute; top: 220px; left: 420px;" data-skill="radiation-resistance">
+                    <span class="text-lg">☢️</span>
+                </div>
+                <div class="skill-node available" style="position: absolute; top: 170px; left: 520px;" data-skill="wilderness-expert">
+                    <span class="text-lg">🧭</span>
+                </div>
+                <div class="skill-node" style="position: absolute; top: 270px; left: 520px;" data-skill="anomaly-survival">
+                    <span class="text-lg">⚠️</span>
+                </div>
+                <div class="skill-node available" style="position: absolute; top: 220px; left: 620px;" data-skill="master-survivalist">
+                    <span class="text-lg">🏆</span>
+                </div>
+                <div class="skill-node" style="position: absolute; top: 320px; left: 620px;" data-skill="zone-master">
+                    <span class="text-lg">🌟</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Perks & Details -->
+        <div class="character-panel rounded-lg p-4 w-80 fade-in">
+            <div class="orbitron text-lg font-bold mb-4">PERKS & ABILITIES</div>
+            
+            <!-- Available Perks -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-3">AVAILABLE PERKS (3)</div>
+                <div class="space-y-2">
+                    <div class="perk-card" data-perk="iron-will">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">💪</span>
+                            <div>
+                                <div class="font-bold">Iron Will</div>
+                                <div class="text-xs text-gray-400">+25% Radiation Resistance</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="perk-card" data-perk="quick-hands">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">⚡</span>
+                            <div>
+                                <div class="font-bold">Quick Hands</div>
+                                <div class="text-xs text-gray-400">+50% Reload Speed</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="perk-card locked" data-perk="zone-navigator">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🧭</span>
+                            <div>
+                                <div class="font-bold">Zone Navigator</div>
+                                <div class="text-xs text-gray-400">Requires: Survival 90</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Perks -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-3">ACTIVE PERKS (2/5)</div>
+                <div class="space-y-2">
+                    <div class="perk-card selected" data-perk="survival-instinct">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🦌</span>
+                            <div>
+                                <div class="font-bold">Survival Instinct</div>
+                                <div class="text-xs text-gray-400">+15% Stamina Regeneration</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="perk-card selected" data-perk="scavenger">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🔍</span>
+                            <div>
+                                <div class="font-bold">Scavenger</div>
+                                <div class="text-xs text-gray-400">+30% Loot Quality</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Skill Details -->
+            <div id="skill-details">
+                <div class="text-center text-gray-500 py-4">
+                    Select a skill to view details
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 space-y-2">
+                <button id="unlock-skill-btn" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    UNLOCK SKILL (1 SP)
+                </button>
+                <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded text-sm transition-colors">
+                    RESET SKILLS
+                </button>
+                <button class="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded text-sm transition-colors">
+                    SAVE BUILD
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="absolute top-4 left-4 fade-in">
+        <button onclick="window.location.href='index.html'" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm transition-colors">
+            ← BACK TO MENU
+        </button>
+    </div>
+
+    <script>
+        let selectedSkill = null;
+        let skillPoints = 5;
+        let playerLevel = 23;
+
+        const skillData = {
+            'basic-survival': {
+                name: 'Basic Survival',
+                description: 'Fundamental survival techniques for the Zone. Increases stamina regeneration and reduces hunger rate.',
+                icon: '🏕️',
+                effect: '+10% Stamina Regeneration, -20% Hunger Rate',
+                requirement: 'Level 1',
+                cost: 0,
+                unlocked: true
+            },
+            'foraging': {
+                name: 'Foraging',
+                description: 'Ability to find edible plants and resources in the wilderness.',
+                icon: '🌿',
+                effect: '+25% Food Finding, +15% Medicinal Plants',
+                requirement: 'Basic Survival',
+                cost: 1,
+                unlocked: true
+            },
+            'animal-tracking': {
+                name: 'Animal Tracking',
+                description: 'Track wildlife and avoid dangerous predators.',
+                icon: '👣',
+                effect: '+30% Animal Detection, +20% Stealth vs Animals',
+                requirement: 'Foraging',
+                cost: 1,
+                unlocked: true
+            },
+            'weather-resistance': {
+                name: 'Weather Resistance',
+                description: 'Improved resistance to harsh weather conditions.',
+                icon: '🌧️',
+                effect: '+40% Weather Resistance, -30% Cold/Hot Effects',
+                requirement: 'Foraging',
+                cost: 2,
+                unlocked: false
+            },
+            'advanced-camping': {
+                name: 'Advanced Camping',
+                description: 'Set up advanced campsites with improved rest benefits.',
+                icon: '⛺',
+                effect: '+50% Rest Quality, Campfire Benefits',
+                requirement: 'Animal Tracking',
+                cost: 2,
+                unlocked: true
+            },
+            'radiation-resistance': {
+                name: 'Radiation Resistance',
+                description: 'Enhanced resistance to radiation exposure.',
+                icon: '☢️',
+                effect: '+35% Radiation Resistance, -25% Radiation Accumulation',
+                requirement: 'Weather Resistance',
+                cost: 3,
+                unlocked: false
+            },
+            'wilderness-expert': {
+                name: 'Wilderness Expert',
+                description: 'Master of wilderness survival and navigation.',
+                icon: '🧭',
+                effect: '+40% Navigation, +30% Resource Detection',
+                requirement: 'Advanced Camping',
+                cost: 3,
+                unlocked: false
+            },
+            'anomaly-survival': {
+                name: 'Anomaly Survival',
+                description: 'Survive and navigate through dangerous anomaly fields.',
+                icon: '⚠️',
+                effect: '+50% Anomaly Resistance, Anomaly Detection',
+                requirement: 'Radiation Resistance',
+                cost: 4,
+                unlocked: false
+            },
+            'master-survivalist': {
+                name: 'Master Survivalist',
+                description: 'Ultimate survival expertise in the Zone.',
+                icon: '🏆',
+                effect: '+25% All Survival Skills, Master Tracker',
+                requirement: 'Wilderness Expert',
+                cost: 5,
+                unlocked: false
+            },
+            'zone-master': {
+                name: 'Zone Master',
+                description: 'Become one with the Zone.',
+                icon: '🌟',
+                effect: 'Immunity to Environmental Hazards, Zone Harmony',
+                requirement: 'Master Survivalist, Anomaly Survival',
+                cost: 8,
+                unlocked: false
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize animations
+            anime({
+                targets: '.fade-in',
+                opacity: [0, 1],
+                translateY: [20, 0],
+                duration: 1000,
+                delay: anime.stagger(100),
+                easing: 'easeOutQuart'
+            });
+
+            setupSkillTree();
+            setupPerks();
+            updateSkillPoints();
+        });
+
+        function setupSkillTree() {
+            const skillNodes = document.querySelectorAll('.skill-node');
+            
+            skillNodes.forEach(node => {
+                node.addEventListener('click', () => {
+                    const skillId = node.dataset.skill;
+                    selectSkill(skillId, node);
+                });
+
+                node.addEventListener('mouseenter', () => {
+                    const skillId = node.dataset.skill;
+                    showSkillTooltip(skillId, node);
+                });
+
+                node.addEventListener('mouseleave', () => {
+                    hideSkillTooltip();
+                });
+            });
+        }
+
+        function selectSkill(skillId, nodeElement) {
+            selectedSkill = skillId;
+            const skill = skillData[skillId];
+            
+            // Update skill details panel
+            const detailsPanel = document.getElementById('skill-details');
+            detailsPanel.innerHTML = `
+                <div class="text-center mb-4">
+                    <div class="text-4xl mb-2">${skill.icon}</div>
+                    <div class="orbitron font-bold text-lg">${skill.name}</div>
+                    <div class="text-sm text-gray-400">${skill.requirement}</div>
+                </div>
+                
+                <div class="text-xs space-y-2 mb-4">
+                    <div><strong>Effect:</strong> ${skill.effect}</div>
+                    <div><strong>Cost:</strong> ${skill.cost} Skill Points</div>
+                </div>
+                
+                <div class="text-xs text-gray-400 mb-4">
+                    ${skill.description}
+                </div>
+            `;
+
+            // Update unlock button
+            const unlockBtn = document.getElementById('unlock-skill-btn');
+            if (skill.unlocked) {
+                unlockBtn.textContent = 'ALREADY UNLOCKED';
+                unlockBtn.disabled = true;
+            } else if (skillPoints >= skill.cost) {
+                unlockBtn.textContent = `UNLOCK SKILL (${skill.cost} SP)`;
+                unlockBtn.disabled = false;
+                unlockBtn.onclick = () => unlockSkill(skillId, nodeElement);
+            } else {
+                unlockBtn.textContent = `NOT ENOUGH SP (${skill.cost} needed)`;
+                unlockBtn.disabled = true;
+            }
+        }
+
+        function unlockSkill(skillId, nodeElement) {
+            const skill = skillData[skillId];
+            
+            if (skillPoints >= skill.cost && !skill.unlocked) {
+                skillPoints -= skill.cost;
+                skill.unlocked = true;
+                
+                // Update node appearance
+                nodeElement.classList.remove('available');
+                nodeElement.classList.add('unlocked');
+                
+                // Update connections
+                updateSkillConnections(skillId);
+                
+                // Update displays
+                updateSkillPoints();
+                selectSkill(skillId, nodeElement);
+                
+                showNotification('SKILL UNLOCKED', `${skill.name} has been learned!`);
+                
+                // Animate unlock
+                anime({
+                    targets: nodeElement,
+                    scale: [1, 1.3, 1],
+                    duration: 500,
+                    easing: 'easeOutElastic(1, .8)'
+                });
+            }
+        }
+
+        function updateSkillConnections(skillId) {
+            // In a real implementation, this would update the SVG connections
+            // For now, we'll just show a visual feedback
+            const connections = document.querySelectorAll('.skill-connection');
+            connections.forEach(connection => {
+                if (Math.random() < 0.3) { // Randomly activate some connections
+                    connection.classList.add('active');
+                }
+            });
+        }
+
+        function updateSkillPoints() {
+            document.querySelector('.skill-points').textContent = `SP: ${skillPoints}`;
+        }
+
+        function setupPerks() {
+            const perkCards = document.querySelectorAll('.perk-card:not(.locked)');
+            
+            perkCards.forEach(card => {
+                card.addEventListener('click', () => {
+                    const perkId = card.dataset.perk;
+                    togglePerk(perkId, card);
+                });
+            });
+        }
+
+        function togglePerk(perkId, cardElement) {
+            const isSelected = cardElement.classList.contains('selected');
+            
+            if (isSelected) {
+                cardElement.classList.remove('selected');
+                showNotification('PERK REMOVED', 'Perk has been deactivated');
+            } else {
+                // Check if we have enough perk slots
+                const selectedPerks = document.querySelectorAll('.perk-card.selected');
+                if (selectedPerks.length >= 5) {
+                    showNotification('PERK LIMIT REACHED', 'You can only have 5 active perks');
+                    return;
+                }
+                
+                cardElement.classList.add('selected');
+                showNotification('PERK ACTIVATED', 'Perk has been equipped');
+            }
+        }
+
+        function showSkillTooltip(skillId, nodeElement) {
+            const skill = skillData[skillId];
+            
+            // Create tooltip
+            const tooltip = document.createElement('div');
+            tooltip.className = 'absolute bg-black border border-green-500 p-3 rounded text-xs z-50 pointer-events-none';
+            tooltip.style.left = nodeElement.offsetLeft + 70 + 'px';
+            tooltip.style.top = nodeElement.offsetTop + 'px';
+            tooltip.innerHTML = `
+                <div class="font-bold text-green-400">${skill.name}</div>
+                <div class="text-gray-400 mb-1">${skill.effect}</div>
+                <div class="text-xs">${skill.requirement}</div>
+            `;
+            
+            nodeElement.appendChild(tooltip);
+        }
+
+        function hideSkillTooltip() {
+            const tooltips = document.querySelectorAll('.skill-node > div');
+            tooltips.forEach(tooltip => {
+                if (tooltip.className.includes('absolute')) {
+                    tooltip.remove();
+                }
+            });
+        }
+
+        function showNotification(title, message) {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-black border-l-4 border-green-500 p-4 text-white z-50 transform translate-x-full transition-transform duration-300';
+            notification.innerHTML = `
+                <div class="font-bold text-green-400">${title}</div>
+                <div class="text-sm text-gray-400">${message}</div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+            }, 100);
+            
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // Simulate skill point gain over time
+        setInterval(() => {
+            if (Math.random() < 0.1) { // 10% chance every 10 seconds
+                skillPoints += 1;
+                updateSkillPoints();
+                showNotification('SKILL POINT GAINED', 'You have earned 1 skill point!');
+            }
+        }, 10000);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                window.location.href = 'index.html';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STALKER MMO - Game Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #1a1a1a;
+            --secondary-dark: #2d3748;
+            --accent-green: #10b981;
+            --warning-amber: #f59e0b;
+            --danger-red: #ef4444;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --radioactive-green: #39ff14;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--primary-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            cursor: crosshair;
+        }
+
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .game-bg {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d3748 50%, #1a1a1a 100%);
+            position: relative;
+        }
+
+        .game-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('resources/hud_interface.png') center/cover;
+            opacity: 0.1;
+            z-index: 0;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 0, 0.02) 2px,
+                rgba(0, 255, 0, 0.02) 4px
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .hud-element {
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid var(--secondary-dark);
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+
+        .hud-element:hover {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+        }
+
+        .health-bar {
+            background: linear-gradient(90deg, var(--danger-red) 0%, var(--warning-amber) 50%, var(--accent-green) 100%);
+            height: 8px;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .health-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: health-scan 2s infinite;
+        }
+
+        @keyframes health-scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .radiation-indicator {
+            background: radial-gradient(circle, var(--warning-amber) 0%, transparent 70%);
+            animation: radiation-pulse 3s infinite;
+        }
+
+        @keyframes radiation-pulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.1); }
+        }
+
+        .ammo-counter {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid var(--accent-green);
+            color: var(--radioactive-green);
+            font-weight: bold;
+            text-shadow: 0 0 10px var(--radioactive-green);
+        }
+
+        .minimap {
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%);
+            border: 2px solid var(--accent-green);
+            position: relative;
+        }
+
+        .minimap::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px;
+            height: 4px;
+            background: var(--radioactive-green);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--radioactive-green);
+        }
+
+        .quick-slot {
+            background: rgba(45, 55, 72, 0.8);
+            border: 1px solid var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .quick-slot:hover {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .quick-slot.active {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.2);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+        }
+
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: var(--accent-green);
+            opacity: 0.8;
+        }
+
+        .crosshair::before {
+            width: 2px;
+            height: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .crosshair::after {
+            width: 20px;
+            height: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .threat-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            border: 2px solid transparent;
+            border-radius: 50%;
+            animation: threat-pulse 2s infinite;
+        }
+
+        @keyframes threat-pulse {
+            0%, 100% { 
+                border-color: transparent;
+                box-shadow: none;
+            }
+            50% { 
+                border-color: var(--danger-red);
+                box-shadow: 0 0 30px rgba(239, 68, 68, 0.5);
+            }
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border-left: 4px solid var(--accent-green);
+            padding: 12px 16px;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .weapon-wheel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 300px;
+            height: 300px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid var(--accent-green);
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+            z-index: 999;
+        }
+
+        .weapon-wheel.active {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .wheel-segment {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: rgba(45, 55, 72, 0.8);
+            border: 1px solid var(--text-secondary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .wheel-segment:hover {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.2);
+        }
+    </style>
+</head>
+<body class="game-bg">
+    <div class="scanlines"></div>
+    <div class="crosshair"></div>
+    
+    <!-- Game HUD -->
+    <div class="h-screen relative">
+        <!-- Top HUD -->
+        <div class="absolute top-4 left-4 right-4 flex justify-between items-start fade-in">
+            <!-- Health and Status -->
+            <div class="hud-element p-4 rounded-lg w-64">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="orbitron text-sm font-bold">VITAL SIGNS</span>
+                    <span class="text-xs text-green-400">NORMAL</span>
+                </div>
+                <div class="space-y-2">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>HEALTH</span>
+                            <span id="health-value">85/100</span>
+                        </div>
+                        <div class="health-bar w-full">
+                            <div id="health-fill" class="h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded" style="width: 85%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>RADIATION</span>
+                            <span id="radiation-value">12%</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded h-2">
+                            <div id="radiation-fill" class="bg-yellow-500 h-2 rounded" style="width: 12%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mission Info -->
+            <div class="hud-element p-4 rounded-lg w-80">
+                <div class="orbitron text-sm font-bold mb-2">ACTIVE MISSION</div>
+                <div class="text-xs space-y-1">
+                    <div class="text-yellow-400">Retrieve Artifact from Red Forest</div>
+                    <div class="text-gray-400">Progress: 3/5 objectives completed</div>
+                    <div class="text-green-400">Reward: 5000 RU, Military Grade Ammo</div>
+                </div>
+            </div>
+
+            <!-- Environment Status -->
+            <div class="hud-element p-4 rounded-lg w-48">
+                <div class="orbitron text-sm font-bold mb-2">ENVIRONMENT</div>
+                <div class="text-xs space-y-1">
+                    <div class="flex justify-between">
+                        <span>TIME:</span>
+                        <span id="game-time">14:32</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>WEATHER:</span>
+                        <span class="text-gray-400">Overcast</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>RADIATION:</span>
+                        <span class="text-yellow-400">MODERATE</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom HUD -->
+        <div class="absolute bottom-4 left-4 right-4 flex justify-between items-end fade-in">
+            <!-- Weapon Info -->
+            <div class="hud-element p-4 rounded-lg">
+                <div class="flex items-center gap-4">
+                    <div class="text-center">
+                        <div class="orbitron text-xs font-bold mb-1">PRIMARY</div>
+                        <div class="w-16 h-16 bg-gray-700 rounded border-2 border-green-500 flex items-center justify-center">
+                            <span class="text-2xl">🔫</span>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="ammo-counter px-3 py-1 rounded text-lg">
+                            <span id="current-ammo">30</span>/<span id="reserve-ammo">180</span>
+                        </div>
+                        <div class="text-xs text-center">
+                            <div>AK-74M</div>
+                            <div class="text-gray-400">5.45x39mm</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Slots -->
+            <div class="flex gap-2">
+                <div class="quick-slot active w-12 h-12 rounded flex items-center justify-center cursor-pointer" data-slot="1">
+                    <span class="text-lg">💊</span>
+                </div>
+                <div class="quick-slot w-12 h-12 rounded flex items-center justify-center cursor-pointer" data-slot="2">
+                    <span class="text-lg">🩹</span>
+                </div>
+                <div class="quick-slot w-12 h-12 rounded flex items-center justify-center cursor-pointer" data-slot="3">
+                    <span class="text-lg">🔋</span>
+                </div>
+                <div class="quick-slot w-12 h-12 rounded flex items-center justify-center cursor-pointer" data-slot="4">
+                    <span class="text-lg">🧃</span>
+                </div>
+            </div>
+
+            <!-- Mini-map -->
+            <div class="minimap w-32 h-32 rounded-lg relative">
+                <div class="absolute inset-2 border border-green-500 rounded opacity-30">
+                    <div class="absolute top-1 left-1 w-1 h-1 bg-green-400 rounded"></div>
+                    <div class="absolute top-1 right-1 w-1 h-1 bg-yellow-400 rounded"></div>
+                    <div class="absolute bottom-1 left-1 w-1 h-1 bg-red-400 rounded"></div>
+                </div>
+                <div class="absolute bottom-1 right-1 text-xs text-green-400">
+                    <div>N48°09'</div>
+                    <div>E29°15'</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Communication Panel -->
+        <div class="absolute top-1/2 right-4 transform -translate-y-1/2 hud-element p-4 rounded-lg w-64 fade-in">
+            <div class="orbitron text-sm font-bold mb-2">SQUAD COMMS</div>
+            <div class="space-y-2 text-xs">
+                <div class="text-green-400">
+                    <span class="text-gray-400">[Ghost]:</span> Moving to extraction point
+                </div>
+                <div class="text-blue-400">
+                    <span class="text-gray-400">[Reaper]:</span> Covering your six
+                </div>
+                <div class="text-purple-400">
+                    <span class="text-gray-400">[Doc]:</span> Need medical supplies
+                </div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-gray-600">
+                <input type="text" placeholder="Type message..." class="w-full bg-gray-800 text-xs p-2 rounded border border-gray-600 focus:border-green-500 outline-none">
+            </div>
+        </div>
+
+        <!-- Threat Detection -->
+        <div id="threat-indicator" class="threat-indicator hidden"></div>
+
+        <!-- Weapon Wheel -->
+        <div id="weapon-wheel" class="weapon-wheel">
+            <div class="wheel-segment" style="top: 20px; left: 50%; transform: translateX(-50%);">
+                <span>🔫</span>
+            </div>
+            <div class="wheel-segment" style="top: 50%; right: 20px; transform: translateY(-50%);">
+                <span>🎯</span>
+            </div>
+            <div class="wheel-segment" style="bottom: 20px; left: 50%; transform: translateX(-50%);">
+                <span>🔪</span>
+            </div>
+            <div class="wheel-segment" style="top: 50%; left: 20px; transform: translateY(-50%);">
+                <span>💣</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="notification">
+        <div class="text-sm font-bold text-green-400">ANOMALY DETECTED</div>
+        <div class="text-xs text-gray-400">Electrical anomaly nearby - Use caution</div>
+    </div>
+
+    <script>
+        // Game state
+        let gameState = {
+            health: 85,
+            radiation: 12,
+            ammo: 30,
+            reserveAmmo: 180,
+            time: new Date(),
+            threats: []
+        };
+
+        // Initialize game interface
+        document.addEventListener('DOMContentLoaded', function() {
+            // Animate HUD elements
+            anime({
+                targets: '.fade-in',
+                opacity: [0, 1],
+                translateY: [20, 0],
+                duration: 1000,
+                delay: anime.stagger(100),
+                easing: 'easeOutQuart'
+            });
+
+            // Start game loop
+            startGameLoop();
+
+            // Setup interactions
+            setupQuickSlots();
+            setupWeaponWheel();
+            setupNotifications();
+
+            // Keyboard controls
+            setupKeyboardControls();
+        });
+
+        function startGameLoop() {
+            setInterval(() => {
+                updateGameTime();
+                simulateThreats();
+                updateVitals();
+            }, 1000);
+        }
+
+        function updateGameTime() {
+            gameState.time = new Date(gameState.time.getTime() + 60000); // 1 minute per second
+            const timeString = gameState.time.toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            document.getElementById('game-time').textContent = timeString;
+        }
+
+        function simulateThreats() {
+            // Random threat detection
+            if (Math.random() < 0.1) { // 10% chance per second
+                showThreat();
+            }
+        }
+
+        function showThreat() {
+            const threatIndicator = document.getElementById('threat-indicator');
+            threatIndicator.classList.remove('hidden');
+            
+            setTimeout(() => {
+                threatIndicator.classList.add('hidden');
+            }, 3000);
+
+            // Show notification
+            showNotification('THREAT DETECTED', 'Hostile presence detected in area');
+        }
+
+        function updateVitals() {
+            // Simulate health changes
+            if (Math.random() < 0.05) {
+                gameState.health = Math.max(0, gameState.health - 1);
+                updateHealthDisplay();
+            }
+
+            // Simulate radiation changes
+            if (Math.random() < 0.03) {
+                gameState.radiation = Math.min(100, gameState.radiation + Math.random() * 2);
+                updateRadiationDisplay();
+            }
+        }
+
+        function updateHealthDisplay() {
+            document.getElementById('health-value').textContent = `${Math.round(gameState.health)}/100`;
+            document.getElementById('health-fill').style.width = `${gameState.health}%`;
+        }
+
+        function updateRadiationDisplay() {
+            document.getElementById('radiation-value').textContent = `${Math.round(gameState.radiation)}%`;
+            document.getElementById('radiation-fill').style.width = `${gameState.radiation}%`;
+        }
+
+        function setupQuickSlots() {
+            const quickSlots = document.querySelectorAll('.quick-slot');
+            quickSlots.forEach(slot => {
+                slot.addEventListener('click', () => {
+                    // Remove active class from all slots
+                    quickSlots.forEach(s => s.classList.remove('active'));
+                    // Add active class to clicked slot
+                    slot.classList.add('active');
+                    
+                    const slotNumber = slot.dataset.slot;
+                    showNotification('ITEM SELECTED', `Quick slot ${slotNumber} activated`);
+                });
+            });
+        }
+
+        function setupWeaponWheel() {
+            let wheelActive = false;
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    wheelActive = !wheelActive;
+                    const wheel = document.getElementById('weapon-wheel');
+                    
+                    if (wheelActive) {
+                        wheel.classList.add('active');
+                    } else {
+                        wheel.classList.remove('active');
+                    }
+                }
+            });
+
+            // Weapon wheel segments
+            const wheelSegments = document.querySelectorAll('.wheel-segment');
+            wheelSegments.forEach(segment => {
+                segment.addEventListener('click', () => {
+                    showNotification('WEAPON SWITCHED', 'Primary weapon selected');
+                    document.getElementById('weapon-wheel').classList.remove('active');
+                    wheelActive = false;
+                });
+            });
+        }
+
+        function setupNotifications() {
+            // Show initial notification after delay
+            setTimeout(() => {
+                showNotification('WELCOME TO THE ZONE', 'Stay alert, stalker');
+            }, 2000);
+        }
+
+        function showNotification(title, message) {
+            const notification = document.getElementById('notification');
+            notification.querySelector('div:first-child').textContent = title;
+            notification.querySelector('div:last-child').textContent = message;
+            
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
+        }
+
+        function setupKeyboardControls() {
+            document.addEventListener('keydown', (e) => {
+                switch(e.key) {
+                    case 'r':
+                    case 'R':
+                        if (gameState.reserveAmmo > 0) {
+                            const ammoNeeded = 30 - gameState.ammo;
+                            const ammoToLoad = Math.min(ammoNeeded, gameState.reserveAmmo);
+                            gameState.ammo += ammoToLoad;
+                            gameState.reserveAmmo -= ammoToLoad;
+                            document.getElementById('current-ammo').textContent = gameState.ammo;
+                            document.getElementById('reserve-ammo').textContent = gameState.reserveAmmo;
+                            showNotification('RELOADING', 'Weapon reloaded');
+                        }
+                        break;
+                    case 'Escape':
+                        window.location.href = 'index.html';
+                        break;
+                }
+            });
+        }
+
+        // Mouse movement for crosshair
+        document.addEventListener('mousemove', (e) => {
+            const crosshair = document.querySelector('.crosshair');
+            crosshair.style.left = e.clientX + 'px';
+            crosshair.style.top = e.clientY + 'px';
+        });
+
+        // Simulate shooting
+        document.addEventListener('click', (e) => {
+            if (gameState.ammo > 0) {
+                gameState.ammo--;
+                document.getElementById('current-ammo').textContent = gameState.ammo;
+                
+                // Muzzle flash effect
+                const muzzleFlash = document.createElement('div');
+                muzzleFlash.style.position = 'fixed';
+                muzzleFlash.style.left = e.clientX + 'px';
+                muzzleFlash.style.top = e.clientY + 'px';
+                muzzleFlash.style.width = '20px';
+                muzzleFlash.style.height = '20px';
+                muzzleFlash.style.background = 'radial-gradient(circle, yellow, orange, transparent)';
+                muzzleFlash.style.borderRadius = '50%';
+                muzzleFlash.style.pointerEvents = 'none';
+                muzzleFlash.style.zIndex = '9999';
+                document.body.appendChild(muzzleFlash);
+                
+                setTimeout(() => {
+                    muzzleFlash.remove();
+                }, 100);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STALKER MMO - Squad Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #1a1a1a;
+            --secondary-dark: #2d3748;
+            --accent-green: #10b981;
+            --warning-amber: #f59e0b;
+            --danger-red: #ef4444;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --radioactive-green: #39ff14;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--primary-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .social-bg {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d3748 50%, #1a1a1a 100%);
+            position: relative;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 0, 0.02) 2px,
+                rgba(0, 255, 0, 0.02) 4px
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .social-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--secondary-dark);
+            backdrop-filter: blur(5px);
+        }
+
+        .squad-member-card {
+            background: rgba(45, 55, 72, 0.8);
+            border: 1px solid var(--secondary-dark);
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .squad-member-card:hover {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .squad-member-card.leader {
+            border-color: var(--warning-amber);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-online { background: var(--accent-green); }
+        .status-away { background: var(--warning-amber); }
+        .status-offline { background: var(--text-secondary); }
+
+        .role-badge {
+            background: var(--warning-amber);
+            color: black;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .role-assault { background: var(--danger-red); color: white; }
+        .role-medic { background: var(--accent-green); color: white; }
+        .role-sniper { background: var(--warning-amber); color: black; }
+        .role-support { background: #3b82f6; color: white; }
+
+        .health-bar {
+            height: 4px;
+            background: var(--secondary-dark);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--danger-red), var(--warning-amber), var(--accent-green));
+            transition: width 0.3s ease;
+        }
+
+        .chat-message {
+            background: rgba(45, 55, 72, 0.6);
+            border-left: 3px solid var(--accent-green);
+            padding: 8px 12px;
+            margin: 4px 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .chat-message.squad {
+            border-left-color: var(--warning-amber);
+        }
+
+        .chat-message.system {
+            border-left-color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .mission-card {
+            background: rgba(45, 55, 72, 0.8);
+            border: 1px solid var(--secondary-dark);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin: 8px 0;
+        }
+
+        .mission-card:hover {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .mission-card.active {
+            border-color: var(--warning-amber);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .difficulty-indicator {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .difficulty-easy { background: var(--accent-green); color: black; }
+        .difficulty-medium { background: var(--warning-amber); color: black; }
+        .difficulty-hard { background: var(--danger-red); color: white; }
+        .difficulty-extreme { background: #7c3aed; color: white; }
+
+        .voice-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            animation: voice-pulse 1s infinite;
+        }
+
+        @keyframes voice-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.2); }
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .typing-dot {
+            width: 4px;
+            height: 4px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        .player-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--secondary-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            border: 2px solid var(--accent-green);
+        }
+
+        .trade-window {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 600px;
+            max-height: 80vh;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid var(--accent-green);
+            border-radius: 8px;
+            padding: 20px;
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .trade-window.active {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 999;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+    </style>
+</head>
+<body class="social-bg">
+    <div class="scanlines"></div>
+    
+    <!-- Main Interface -->
+    <div class="h-screen flex p-4 gap-4">
+        <!-- Left Panel - Squad Management -->
+        <div class="social-panel rounded-lg p-4 w-80 fade-in">
+            <div class="orbitron text-lg font-bold mb-4">SQUAD ROSTER</div>
+            
+            <!-- Squad Members -->
+            <div class="space-y-3 mb-6">
+                <div class="squad-member-card leader">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="player-avatar">👨‍💼</div>
+                        <div class="flex-1">
+                            <div class="font-bold">Ghost <span class="role-badge">LEADER</span></div>
+                            <div class="text-xs text-gray-400">
+                                <span class="status-indicator status-online"></span>
+                                Online - Cordon Base
+                            </div>
+                        </div>
+                        <div class="voice-indicator" title="Voice Chat Active"></div>
+                    </div>
+                    <div class="text-xs space-y-1">
+                        <div class="flex justify-between">
+                            <span>Role:</span>
+                            <span class="role-badge role-assault">Assault</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Health:</span>
+                            <span>95%</span>
+                        </div>
+                        <div class="health-bar">
+                            <div class="health-fill" style="width: 95%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="squad-member-card">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="player-avatar">👩‍⚕️</div>
+                        <div class="flex-1">
+                            <div class="font-bold">Doc</div>
+                            <div class="text-xs text-gray-400">
+                                <span class="status-indicator status-online"></span>
+                                Online - Red Forest
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-xs space-y-1">
+                        <div class="flex justify-between">
+                            <span>Role:</span>
+                            <span class="role-badge role-medic">Medic</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Health:</span>
+                            <span>78%</span>
+                        </div>
+                        <div class="health-bar">
+                            <div class="health-fill" style="width: 78%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="squad-member-card">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="player-avatar">🎯</div>
+                        <div class="flex-1">
+                            <div class="font-bold">Reaper</div>
+                            <div class="text-xs text-gray-400">
+                                <span class="status-indicator status-away"></span>
+                                Away - Garbage
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-xs space-y-1">
+                        <div class="flex justify-between">
+                            <span>Role:</span>
+                            <span class="role-badge role-sniper">Sniper</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Health:</span>
+                            <span>45%</span>
+                        </div>
+                        <div class="health-bar">
+                            <div class="health-fill" style="width: 45%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="squad-member-card">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="player-avatar">🔧</div>
+                        <div class="flex-1">
+                            <div class="font-bold">Spark</div>
+                            <div class="text-xs text-gray-400">
+                                <span class="status-indicator status-offline"></span>
+                                Offline - Last: Yantar
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-xs space-y-1">
+                        <div class="flex justify-between">
+                            <span>Role:</span>
+                            <span class="role-badge role-support">Support</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Health:</span>
+                            <span>--</span>
+                        </div>
+                        <div class="health-bar">
+                            <div class="health-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Squad Actions -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-3">SQUAD ACTIONS</div>
+                <div class="space-y-2">
+                    <button class="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded text-sm transition-colors">
+                        INVITE PLAYER
+                    </button>
+                    <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded text-sm transition-colors">
+                        FORM SQUAD
+                    </button>
+                    <button class="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-3 rounded text-sm transition-colors">
+                        LEAVE SQUAD
+                    </button>
+                </div>
+            </div>
+
+            <!-- Team Stats -->
+            <div>
+                <div class="text-sm font-bold mb-3">TEAM STATISTICS</div>
+                <div class="text-xs space-y-2">
+                    <div class="flex justify-between">
+                        <span>Missions Completed:</span>
+                        <span class="text-green-400">47</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Artifacts Found:</span>
+                        <span class="text-blue-400">23</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Survival Rate:</span>
+                        <span class="text-yellow-400">89%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Average Mission Time:</span>
+                        <span class="text-gray-400">2.3h</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Panel - Communications -->
+        <div class="flex-1 social-panel rounded-lg p-4 fade-in">
+            <div class="flex justify-between items-center mb-4">
+                <div class="orbitron text-lg font-bold">SQUAD COMMS</div>
+                <div class="flex gap-2">
+                    <button class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm transition-colors">
+                        🎤 PUSH TO TALK
+                    </button>
+                    <button class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm transition-colors">
+                        📞 RADIO
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat Messages -->
+            <div class="h-96 overflow-y-auto mb-4 space-y-2">
+                <div class="chat-message squad">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="font-bold text-yellow-400">[Ghost]:</span>
+                        <span class="text-xs text-gray-400">14:32</span>
+                    </div>
+                    <div class="text-sm">Team, rally at Cordon Base for briefing. New mission available.</div>
+                </div>
+
+                <div class="chat-message">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="font-bold text-green-400">[Doc]:</span>
+                        <span class="text-xs text-gray-400">14:33</span>
+                    </div>
+                    <div class="text-sm">Copy that. I'm at Red Forest, need extraction. Low on medical supplies.</div>
+                </div>
+
+                <div class="chat-message squad">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="font-bold text-blue-400">[Reaper]:</span>
+                        <span class="text-xs text-gray-400">14:35</span>
+                    </div>
+                    <div class="text-sm">I can provide overwatch from Garbage. Have clear sight lines to Cordon.</div>
+                </div>
+
+                <div class="chat-message system">
+                    <div class="text-sm text-gray-400">
+                        System: Mission "Artifact Retrieval" updated in objectives.
+                    </div>
+                </div>
+
+                <div class="chat-message">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="font-bold text-yellow-400">[Ghost]:</span>
+                        <span class="text-xs text-gray-400">14:38</span>
+                    </div>
+                    <div class="text-sm">Reaper, can you scout the anomaly field north of your position?</div>
+                </div>
+
+                <div class="chat-message squad">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="font-bold text-blue-400">[Reaper]:</span>
+                        <span class="text-xs text-gray-400">14:39</span>
+                    </div>
+                    <div class="text-sm">Roger. Moving to overwatch position now. ETA 5 minutes.</div>
+                </div>
+
+                <div class="typing-indicator">
+                    <span>Doc is typing</span>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="flex gap-2">
+                <input type="text" placeholder="Type message..." class="flex-1 bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-green-500 outline-none text-sm">
+                <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors">
+                    SEND
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Panel - Missions & Events -->
+        <div class="social-panel rounded-lg p-4 w-80 fade-in">
+            <div class="orbitron text-lg font-bold mb-4">MISSIONS & EVENTS</div>
+            
+            <!-- Active Missions -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-3">ACTIVE MISSIONS</div>
+                <div class="space-y-2">
+                    <div class="mission-card active">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="font-bold text-yellow-400">Artifact Retrieval</div>
+                            <div class="difficulty-indicator difficulty-hard">HARD</div>
+                        </div>
+                        <div class="text-xs text-gray-400 mb-2">
+                            Recover rare artifact from Red Forest anomaly field.
+                        </div>
+                        <div class="text-xs">
+                            <div>Reward: 15,000 RU + Faction Rep</div>
+                            <div class="text-green-400">Progress: 2/4 objectives</div>
+                        </div>
+                    </div>
+
+                    <div class="mission-card">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="font-bold text-blue-400">Supply Delivery</div>
+                            <div class="difficulty-indicator difficulty-easy">EASY</div>
+                        </div>
+                        <div class="text-xs text-gray-400 mb-2">
+                            Deliver medical supplies to Cordon outpost.
+                        </div>
+                        <div class="text-xs">
+                            <div>Reward: 3,500 RU + Medical Supplies</div>
+                            <div class="text-green-400">Ready to start</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Available Missions -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-3">AVAILABLE MISSIONS</div>
+                <div class="space-y-2">
+                    <div class="mission-card">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="font-bold text-red-400">Base Defense</div>
+                            <div class="difficulty-indicator difficulty-medium">MEDIUM</div>
+                        </div>
+                        <div class="text-xs text-gray-400 mb-2">
+                            Defend Cordon Base from bandit attack.
+                        </div>
+                        <div class="text-xs">
+                            <div>Reward: 8,000 RU + Military Gear</div>
+                            <div class="text-yellow-400">Time limit: 2 hours</div>
+                        </div>
+                    </div>
+
+                    <div class="mission-card">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="font-bold text-purple-400">Scientific Data</div>
+                            <div class="difficulty-indicator difficulty-extreme">EXTREME</div>
+                        </div>
+                        <div class="text-xs text-gray-400 mb-2">
+                            Retrieve research data from Yantar Lab.
+                        </div>
+                        <div class="text-xs">
+                            <div>Reward: 25,000 RU + Rare Tech</div>
+                            <div class="text-red-400">High radiation zone</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upcoming Events -->
+            <div class="mb-6">
+                <div class="text-sm font-bold mb-3">UPCOMING EVENTS</div>
+                <div class="space-y-2 text-xs">
+                    <div class="bg-gray-800 p-3 rounded">
+                        <div class="font-bold text-green-400">Faction War</div>
+                        <div class="text-gray-400">Duty vs Freedom conflict</div>
+                        <div class="text-yellow-400">Starts in: 3h 45m</div>
+                    </div>
+                    <div class="bg-gray-800 p-3 rounded">
+                        <div class="font-bold text-blue-400">Emission</div>
+                        <div class="text-gray-400">Take cover immediately</div>
+                        <div class="text-red-400">Expected: 45m</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div>
+                <div class="text-sm font-bold mb-3">QUICK ACTIONS</div>
+                <div class="space-y-2">
+                    <button class="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded text-sm transition-colors">
+                        START MISSION
+                    </button>
+                    <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded text-sm transition-colors">
+                        FIND GROUP
+                    </button>
+                    <button onclick="openTradeWindow()" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-3 rounded text-sm transition-colors">
+                        TRADE
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="absolute top-4 left-4 fade-in">
+        <button onclick="window.location.href='index.html'" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm transition-colors">
+            ← BACK TO MENU
+        </button>
+    </div>
+
+    <!-- Trade Window Modal -->
+    <div class="overlay" id="trade-overlay"></div>
+    <div class="trade-window" id="trade-window">
+        <div class="flex justify-between items-center mb-4">
+            <div class="orbitron text-lg font-bold">TRADE WITH GHOST</div>
+            <button onclick="closeTradeWindow()" class="text-gray-400 hover:text-white text-xl">✕</button>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+                <div class="text-sm font-bold mb-2">YOUR INVENTORY</div>
+                <div class="bg-gray-800 p-4 rounded h-48 overflow-y-auto">
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between items-center p-2 bg-gray-700 rounded">
+                            <span>🩹 Medkit x3</span>
+                            <button class="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs">OFFER</button>
+                        </div>
+                        <div class="flex justify-between items-center p-2 bg-gray-700 rounded">
+                            <span>🎯 5.45mm x120</span>
+                            <button class="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs">OFFER</button>
+                        </div>
+                        <div class="flex justify-between items-center p-2 bg-gray-700 rounded">
+                            <span>💎 Artifact x1</span>
+                            <button class="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs">OFFER</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                <div class="text-sm font-bold mb-2">GHOST'S INVENTORY</div>
+                <div class="bg-gray-800 p-4 rounded h-48 overflow-y-auto">
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between items-center p-2 bg-gray-700 rounded">
+                            <span>🔫 AK-74M</span>
+                            <span class="text-yellow-400">15,000 RU</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 bg-gray-700 rounded">
+                            <span>🎯 7.62mm x200</span>
+                            <span class="text-yellow-400">2,000 RU</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 bg-gray-700 rounded">
+                            <span>🧃 Energy Drinks x5</span>
+                            <span class="text-yellow-400">750 RU</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-gray-800 p-4 rounded mb-4">
+            <div class="text-sm font-bold mb-2">CURRENT OFFER</div>
+            <div class="text-xs text-gray-400">
+                No items selected for trade
+            </div>
+        </div>
+        
+        <div class="flex gap-2">
+            <button class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded text-sm transition-colors">
+                ACCEPT TRADE
+            </button>
+            <button class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded text-sm transition-colors">
+                CANCEL
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize animations
+            anime({
+                targets: '.fade-in',
+                opacity: [0, 1],
+                translateY: [20, 0],
+                duration: 1000,
+                delay: anime.stagger(100),
+                easing: 'easeOutQuart'
+            });
+
+            setupChatSystem();
+            setupSquadInteractions();
+            simulateRealTimeUpdates();
+        });
+
+        function setupChatSystem() {
+            const chatInput = document.querySelector('input[placeholder="Type message..."]');
+            const sendButton = chatInput.nextElementSibling;
+
+            function sendMessage() {
+                const message = chatInput.value.trim();
+                if (message) {
+                    addChatMessage('You', message, 'normal');
+                    chatInput.value = '';
+                    
+                    // Simulate response
+                    setTimeout(() => {
+                        const responses = [
+                            'Roger that!',
+                            'Copy, moving now.',
+                            'Need backup at my location.',
+                            'Target acquired.',
+                            'Mission parameters updated.'
+                        ];
+                        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+                        const squadMembers = ['Ghost', 'Doc', 'Reaper'];
+                        const randomMember = squadMembers[Math.floor(Math.random() * squadMembers.length)];
+                        addChatMessage(randomMember, randomResponse, 'squad');
+                    }, 1000 + Math.random() * 2000);
+                }
+            }
+
+            sendButton.addEventListener('click', sendMessage);
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+
+            // Typing indicator
+            let typingTimer;
+            chatInput.addEventListener('input', () => {
+                clearTimeout(typingTimer);
+                // Show typing indicator logic would go here
+                
+                typingTimer = setTimeout(() => {
+                    // Hide typing indicator
+                }, 1000);
+            });
+        }
+
+        function addChatMessage(sender, message, type = 'normal') {
+            const chatContainer = document.querySelector('.h-96.overflow-y-auto');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            const colorClass = type === 'squad' ? 'text-yellow-400' : 
+                              type === 'system' ? 'text-gray-400' : 'text-green-400';
+            
+            messageDiv.innerHTML = `
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="font-bold ${colorClass}">[${sender}]:</span>
+                    <span class="text-xs text-gray-400">${timestamp}</span>
+                </div>
+                <div class="text-sm">${message}</div>
+            `;
+            
+            // Remove typing indicator if present
+            const typingIndicator = chatContainer.querySelector('.typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function setupSquadInteractions() {
+            const squadCards = document.querySelectorAll('.squad-member-card');
+            
+            squadCards.forEach(card => {
+                card.addEventListener('click', () => {
+                    // Show member details or context menu
+                    const memberName = card.querySelector('.font-bold').textContent.split(' ')[0];
+                    showMemberContextMenu(memberName, card);
+                });
+            });
+        }
+
+        function showMemberContextMenu(memberName, cardElement) {
+            // Simple context menu simulation
+            const actions = [
+                `View ${memberName}'s profile`,
+                `Send private message to ${memberName}`,
+                `Trade with ${memberName}`,
+                `Kick ${memberName} from squad`,
+                `Promote ${memberName} to leader`
+            ];
+            
+            const action = prompt(`Select action for ${memberName}:\n${actions.map((a, i) => `${i + 1}. ${a}`).join('\n')}`);
+            
+            if (action && action >= 1 && action <= actions.length) {
+                showNotification('SQUAD ACTION', `${actions[action - 1]} selected`);
+            }
+        }
+
+        function simulateRealTimeUpdates() {
+            // Simulate health changes
+            setInterval(() => {
+                const healthBars = document.querySelectorAll('.health-fill');
+                healthBars.forEach(bar => {
+                    if (Math.random() < 0.1) { // 10% chance
+                        const currentWidth = parseInt(bar.style.width) || 100;
+                        const change = (Math.random() - 0.5) * 10;
+                        const newWidth = Math.max(0, Math.min(100, currentWidth + change));
+                        bar.style.width = newWidth + '%';
+                        
+                        // Update text
+                        const healthText = bar.closest('.squad-member-card').querySelector('.flex.justify-between span:last-child');
+                        if (healthText) {
+                            healthText.textContent = Math.round(newWidth) + '%';
+                        }
+                    }
+                });
+            }, 5000);
+
+            // Simulate status changes
+            setInterval(() => {
+                const statusIndicators = document.querySelectorAll('.status-indicator');
+                statusIndicators.forEach(indicator => {
+                    if (Math.random() < 0.05) { // 5% chance
+                        const statuses = ['status-online', 'status-away', 'status-offline'];
+                        const currentStatus = statuses.find(s => indicator.classList.contains(s));
+                        const newStatus = statuses[Math.floor(Math.random() * statuses.length)];
+                        
+                        if (currentStatus) {
+                            indicator.classList.remove(currentStatus);
+                        }
+                        indicator.classList.add(newStatus);
+                    }
+                });
+            }, 10000);
+
+            // Simulate voice activity
+            setInterval(() => {
+                const voiceIndicators = document.querySelectorAll('.voice-indicator');
+                voiceIndicators.forEach(indicator => {
+                    if (Math.random() < 0.3) { // 30% chance
+                        indicator.style.animation = 'none';
+                        setTimeout(() => {
+                            indicator.style.animation = 'voice-pulse 1s infinite';
+                        }, 100);
+                    }
+                });
+            }, 3000);
+        }
+
+        function openTradeWindow() {
+            document.getElementById('trade-overlay').classList.add('active');
+            document.getElementById('trade-window').classList.add('active');
+        }
+
+        function closeTradeWindow() {
+            document.getElementById('trade-overlay').classList.remove('active');
+            document.getElementById('trade-window').classList.remove('active');
+        }
+
+        function showNotification(title, message) {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-black border-l-4 border-green-500 p-4 text-white z-50 transform translate-x-full transition-transform duration-300';
+            notification.innerHTML = `
+                <div class="font-bold text-green-400">${title}</div>
+                <div class="text-sm text-gray-400">${message}</div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+            }, 100);
+            
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (document.getElementById('trade-window').classList.contains('active')) {
+                    closeTradeWindow();
+                } else {
+                    window.location.href = 'index.html';
+                }
+            }
+        });
+
+        // Close trade window when clicking overlay
+        document.getElementById('trade-overlay').addEventListener('click', closeTradeWindow);
+    </script>
+</body>
+</html>

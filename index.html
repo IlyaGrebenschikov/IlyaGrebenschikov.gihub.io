@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STALKER MMO - Zone Survival</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://unpkg.com/splitting@1.0.6/dist/splitting.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/splitting@1.0.6/dist/splitting.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #1a1a1a;
+            --secondary-dark: #2d3748;
+            --accent-green: #10b981;
+            --warning-amber: #f59e0b;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --radioactive-green: #39ff14;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--primary-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .main-bg {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d3748 50%, #1a1a1a 100%);
+            position: relative;
+        }
+
+        .main-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('resources/main_menu_bg.png') center/cover;
+            opacity: 0.3;
+            z-index: 0;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 0, 0.03) 2px,
+                rgba(0, 255, 0, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .glitch {
+            position: relative;
+            display: inline-block;
+        }
+
+        .glitch::before,
+        .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .glitch::before {
+            animation: glitch-1 0.5s infinite;
+            color: #ff0040;
+            z-index: -1;
+        }
+
+        .glitch::after {
+            animation: glitch-2 0.5s infinite;
+            color: #00ffff;
+            z-index: -2;
+        }
+
+        @keyframes glitch-1 {
+            0%, 14%, 15%, 49%, 50%, 99%, 100% { transform: translate(0); }
+            15%, 49% { transform: translate(-2px, 2px); }
+        }
+
+        @keyframes glitch-2 {
+            0%, 20%, 21%, 62%, 63%, 99%, 100% { transform: translate(0); }
+            21%, 62% { transform: translate(2px, -2px); }
+        }
+
+        .menu-button {
+            background: rgba(45, 55, 72, 0.8);
+            border: 1px solid var(--accent-green);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .menu-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .menu-button:hover::before {
+            left: 100%;
+        }
+
+        .menu-button:hover {
+            background: rgba(16, 185, 129, 0.1);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .terminal-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .geiger-counter {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border: 1px solid var(--warning-amber);
+            border-radius: 4px;
+        }
+
+        .radiation-level {
+            color: var(--warning-amber);
+            font-weight: bold;
+            animation: flicker 1s infinite alternate;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        .content-overlay {
+            position: relative;
+            z-index: 2;
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .nav-indicator {
+            position: absolute;
+            left: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid var(--accent-green);
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .menu-button:hover .nav-indicator {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="main-bg">
+    <div class="scanlines"></div>
+    
+    <!-- Main Content -->
+    <div class="content-overlay h-screen flex items-center justify-center">
+        <div class="max-w-6xl mx-auto px-8">
+            <!-- Header Section -->
+            <div class="text-center mb-16 fade-in">
+                <h1 class="orbitron text-8xl font-black mb-4 tracking-wider">
+                    <span class="glitch" data-text="STALKER">STALKER</span>
+                </h1>
+                <div class="terminal-text text-2xl text-gray-400 mb-2">
+                    ZONE SURVIVAL MMO
+                </div>
+                <div class="flex items-center justify-center gap-2 text-sm text-gray-500">
+                    <span class="status-indicator"></span>
+                    <span>SYSTEM ONLINE</span>
+                    <span class="mx-2">|</span>
+                    <span>SERVER: CHERNOBYL-1</span>
+                    <span class="mx-2">|</span>
+                    <span>PING: 24ms</span>
+                </div>
+            </div>
+
+            <!-- Menu Navigation -->
+            <div class="grid grid-cols-2 gap-8 max-w-4xl mx-auto fade-in">
+                <div class="space-y-4">
+                    <button onclick="navigateTo('game.html')" class="menu-button w-full p-6 text-left relative group">
+                        <div class="nav-indicator"></div>
+                        <div class="orbitron text-xl font-bold mb-2">ENTER THE ZONE</div>
+                        <div class="terminal-text text-sm text-gray-400">Continue your survival journey</div>
+                        <div class="absolute top-4 right-4 text-xs text-gray-500 group-hover:text-green-400 transition-colors">
+                            F1
+                        </div>
+                    </button>
+
+                    <button onclick="navigateTo('inventory.html')" class="menu-button w-full p-6 text-left relative group">
+                        <div class="nav-indicator"></div>
+                        <div class="orbitron text-xl font-bold mb-2">INVENTORY</div>
+                        <div class="terminal-text text-sm text-gray-400">Manage equipment and supplies</div>
+                        <div class="absolute top-4 right-4 text-xs text-gray-500 group-hover:text-green-400 transition-colors">
+                            F2
+                        </div>
+                    </button>
+
+                    <button onclick="navigateTo('map.html')" class="menu-button w-full p-6 text-left relative group">
+                        <div class="nav-indicator"></div>
+                        <div class="orbitron text-xl font-bold mb-2">ZONE MAP</div>
+                        <div class="terminal-text text-sm text-gray-400">Navigate the contaminated areas</div>
+                        <div class="absolute top-4 right-4 text-xs text-gray-500 group-hover:text-green-400 transition-colors">
+                            F3
+                        </div>
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <button onclick="navigateTo('character.html')" class="menu-button w-full p-6 text-left relative group">
+                        <div class="nav-indicator"></div>
+                        <div class="orbitron text-xl font-bold mb-2">CHARACTER</div>
+                        <div class="terminal-text text-sm text-gray-400">Skills, perks, and progression</div>
+                        <div class="absolute top-4 right-4 text-xs text-gray-500 group-hover:text-green-400 transition-colors">
+                            F4
+                        </div>
+                    </button>
+
+                    <button onclick="navigateTo('social.html')" class="menu-button w-full p-6 text-left relative group">
+                        <div class="nav-indicator"></div>
+                        <div class="orbitron text-xl font-bold mb-2">SQUAD HUB</div>
+                        <div class="terminal-text text-sm text-gray-400">Team management and communications</div>
+                        <div class="absolute top-4 right-4 text-xs text-gray-500 group-hover:text-green-400 transition-colors">
+                            F5
+                        </div>
+                    </button>
+
+                    <button onclick="navigateTo('settings.html')" class="menu-button w-full p-6 text-left relative group">
+                        <div class="nav-indicator"></div>
+                        <div class="orbitron text-xl font-bold mb-2">SETTINGS</div>
+                        <div class="terminal-text text-sm text-gray-400">Configure game options</div>
+                        <div class="absolute top-4 right-4 text-xs text-gray-500 group-hover:text-green-400 transition-colors">
+                            F6
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- System Information -->
+            <div class="mt-16 text-center fade-in">
+                <div class="terminal-text text-xs text-gray-600 space-y-1">
+                    <div>© 2025 Zone Survival MMO - Unauthorized reproduction prohibited</div>
+                    <div>System Version: 2.1.7 | Last Updated: 16.11.2025</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Geiger Counter -->
+    <div class="geiger-counter">
+        <div class="terminal-text text-xs mb-1">RADIATION LEVEL</div>
+        <div class="radiation-level text-lg">0.12 μSv/h</div>
+    </div>
+
+    <script>
+        // Initialize animations
+        document.addEventListener('DOMContentLoaded', function() {
+            // Animate fade-in elements
+            anime({
+                targets: '.fade-in',
+                opacity: [0, 1],
+                translateY: [20, 0],
+                duration: 1000,
+                delay: anime.stagger(200),
+                easing: 'easeOutQuart'
+            });
+
+            // Animate menu buttons on hover
+            const menuButtons = document.querySelectorAll('.menu-button');
+            menuButtons.forEach(button => {
+                button.addEventListener('mouseenter', () => {
+                    anime({
+                        targets: button,
+                        scale: [1, 1.02],
+                        duration: 200,
+                        easing: 'easeOutQuad'
+                    });
+                });
+
+                button.addEventListener('mouseleave', () => {
+                    anime({
+                        targets: button,
+                        scale: [1.02, 1],
+                        duration: 200,
+                        easing: 'easeOutQuad'
+                    });
+                });
+            });
+
+            // Random glitch effect on title
+            setInterval(() => {
+                const glitchElement = document.querySelector('.glitch');
+                anime({
+                    targets: glitchElement,
+                    duration: 100,
+                    complete: () => {
+                        anime({
+                            targets: glitchElement,
+                            duration: 100
+                        });
+                    }
+                });
+            }, 5000);
+
+            // Update radiation level randomly
+            setInterval(() => {
+                const levels = ['0.12 μSv/h', '0.15 μSv/h', '0.11 μSv/h', '0.18 μSv/h'];
+                const randomLevel = levels[Math.floor(Math.random() * levels.length)];
+                document.querySelector('.radiation-level').textContent = randomLevel;
+            }, 3000);
+        });
+
+        // Navigation function
+        function navigateTo(page) {
+            // Add transition effect
+            anime({
+                targets: '.content-overlay',
+                opacity: [1, 0],
+                duration: 300,
+                easing: 'easeInQuart',
+                complete: () => {
+                    window.location.href = page;
+                }
+            });
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            const keyMap = {
+                'F1': 'game.html',
+                'F2': 'inventory.html',
+                'F3': 'map.html',
+                'F4': 'character.html',
+                'F5': 'social.html',
+                'F6': 'settings.html'
+            };
+
+            if (keyMap[e.key]) {
+                e.preventDefault();
+                navigateTo(keyMap[e.key]);
+            }
+        });
+    </script>
+</body>
+</html>

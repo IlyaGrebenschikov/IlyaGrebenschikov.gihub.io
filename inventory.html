@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STALKER MMO - Inventory Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #1a1a1a;
+            --secondary-dark: #2d3748;
+            --accent-green: #10b981;
+            --warning-amber: #f59e0b;
+            --danger-red: #ef4444;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --radioactive-green: #39ff14;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--primary-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .inventory-bg {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d3748 50%, #1a1a1a 100%);
+            position: relative;
+        }
+
+        .inventory-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('resources/inventory_interface.png') center/cover;
+            opacity: 0.1;
+            z-index: 0;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 0, 0.02) 2px,
+                rgba(0, 255, 0, 0.02) 4px
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .inventory-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--secondary-dark);
+            backdrop-filter: blur(5px);
+        }
+
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 2px;
+            background: var(--secondary-dark);
+            padding: 2px;
+        }
+
+        .inventory-slot {
+            aspect-ratio: 1;
+            background: rgba(45, 55, 72, 0.8);
+            border: 1px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .inventory-slot:hover {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .inventory-slot.occupied {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: var(--accent-green);
+        }
+
+        .inventory-slot.drag-over {
+            border-color: var(--warning-amber);
+            background: rgba(245, 158, 11, 0.2);
+        }
+
+        .equipment-slot {
+            width: 80px;
+            height: 80px;
+            background: rgba(45, 55, 72, 0.8);
+            border: 2px solid var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .equipment-slot:hover {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .equipment-slot.occupied {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.2);
+        }
+
+        .item {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            cursor: grab;
+            user-select: none;
+            position: relative;
+        }
+
+        .item:active {
+            cursor: grabbing;
+        }
+
+        .item.dragging {
+            opacity: 0.5;
+            z-index: 1000;
+        }
+
+        .item-count {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            background: var(--accent-green);
+            color: black;
+            font-size: 0.7rem;
+            font-weight: bold;
+            padding: 1px 3px;
+            border-radius: 2px;
+        }
+
+        .item-quality {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .quality-common { background: var(--text-secondary); }
+        .quality-uncommon { background: var(--accent-green); }
+        .quality-rare { background: var(--warning-amber); }
+        .quality-legendary { background: #f59e0b; }
+
+        .stats-bar {
+            height: 4px;
+            background: var(--secondary-dark);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .stats-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .tab-button {
+            background: rgba(45, 55, 72, 0.8);
+            border: 1px solid var(--secondary-dark);
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab-button.active {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: var(--accent-green);
+            color: var(--text-primary);
+        }
+
+        .tab-button:hover {
+            border-color: var(--accent-green);
+        }
+
+        .crafting-recipe {
+            background: rgba(45, 55, 72, 0.6);
+            border: 1px solid var(--secondary-dark);
+            padding: 8px;
+            margin: 4px 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .crafting-recipe:hover {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .crafting-recipe.can-craft {
+            border-color: var(--accent-green);
+        }
+
+        .crafting-recipe.cannot-craft {
+            border-color: var(--danger-red);
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body class="inventory-bg">
+    <div class="scanlines"></div>
+    
+    <!-- Main Interface -->
+    <div class="h-screen flex p-4 gap-4">
+        <!-- Left Panel - Equipment -->
+        <div class="inventory-panel rounded-lg p-4 w-64 fade-in">
+            <div class="orbitron text-lg font-bold mb-4">EQUIPMENT</div>
+            
+            <div class="space-y-4">
+                <div>
+                    <div class="text-sm text-gray-400 mb-2">HELMET</div>
+                    <div class="equipment-slot" data-slot="helmet">
+                        <div class="item" draggable="true" data-item="gas-mask" data-quality="uncommon">
+                            <span>😷</span>
+                            <div class="item-quality quality-uncommon"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="text-sm text-gray-400 mb-2">ARMOR</div>
+                    <div class="equipment-slot" data-slot="armor">
+                        <div class="item" draggable="true" data-item="tactical-vest" data-quality="rare">
+                            <span>🦺</span>
+                            <div class="item-quality quality-rare"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="text-sm text-gray-400 mb-2">PRIMARY</div>
+                    <div class="equipment-slot" data-slot="primary">
+                        <div class="item" draggable="true" data-item="ak74m" data-quality="common">
+                            <span>🔫</span>
+                            <div class="item-quality quality-common"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="text-sm text-gray-400 mb-2">SECONDARY</div>
+                    <div class="equipment-slot" data-slot="secondary">
+                        <div class="item" draggable="true" data-item="pistol" data-quality="common">
+                            <span>🔫</span>
+                            <div class="item-quality quality-common"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="text-sm text-gray-400 mb-2">TOOL</div>
+                    <div class="equipment-slot" data-slot="tool">
+                        <div class="item" draggable="true" data-item="detector" data-quality="uncommon">
+                            <span>📡</span>
+                            <div class="item-quality quality-uncommon"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Stats -->
+            <div class="mt-6">
+                <div class="orbitron text-sm font-bold mb-3">STATS</div>
+                <div class="space-y-2 text-xs">
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span>Carry Weight</span>
+                            <span>18.5/35 kg</span>
+                        </div>
+                        <div class="stats-bar">
+                            <div class="stats-fill bg-yellow-500" style="width: 53%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span>Protection</span>
+                            <span>67%</span>
+                        </div>
+                        <div class="stats-bar">
+                            <div class="stats-fill bg-green-500" style="width: 67%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span>Radiation Resist</span>
+                            <span>45%</span>
+                        </div>
+                        <div class="stats-bar">
+                            <div class="stats-fill bg-blue-500" style="width: 45%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Panel - Inventory Grid -->
+        <div class="flex-1 inventory-panel rounded-lg p-4 fade-in">
+            <div class="flex justify-between items-center mb-4">
+                <div class="orbitron text-lg font-bold">INVENTORY</div>
+                <div class="flex gap-2">
+                    <button class="tab-button active" data-tab="inventory">ITEMS</button>
+                    <button class="tab-button" data-tab="crafting">CRAFTING</button>
+                </div>
+            </div>
+
+            <!-- Inventory Tab -->
+            <div id="inventory-tab" class="tab-content">
+                <div class="inventory-grid mb-4">
+                    <!-- Row 1 -->
+                    <div class="inventory-slot occupied">
+                        <div class="item" draggable="true" data-item="medkit" data-count="3" data-quality="uncommon">
+                            <span>🩹</span>
+                            <div class="item-count">3</div>
+                            <div class="item-quality quality-uncommon"></div>
+                        </div>
+                    </div>
+                    <div class="inventory-slot occupied">
+                        <div class="item" draggable="true" data-item="bandage" data-count="5" data-quality="common">
+                            <span>🩹</span>
+                            <div class="item-count">5</div>
+                            <div class="item-quality quality-common"></div>
+                        </div>
+                    </div>
+                    <div class="inventory-slot occupied">
+                        <div class="item" draggable="true" data-item="ammo-545" data-count="120" data-quality="common">
+                            <span>🎯</span>
+                            <div class="item-count">120</div>
+                            <div class="item-quality quality-common"></div>
+                        </div>
+                    </div>
+                    <div class="inventory-slot occupied">
+                        <div class="item" draggable="true" data-item="grenade" data-count="2" data-quality="uncommon">
+                            <span>💣</span>
+                            <div class="item-count">2</div>
+                            <div class="item-quality quality-uncommon"></div>
+                        </div>
+                    </div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    
+                    <!-- Row 2 -->
+                    <div class="inventory-slot occupied">
+                        <div class="item" draggable="true" data-item="energy-drink" data-count="4" data-quality="common">
+                            <span>🧃</span>
+                            <div class="item-count">4</div>
+                            <div class="item-quality quality-common"></div>
+                        </div>
+                    </div>
+                    <div class="inventory-slot occupied">
+                        <div class="item" draggable="true" data-item="battery" data-count="6" data-quality="common">
+                            <span>🔋</span>
+                            <div class="item-count">6</div>
+                            <div class="item-quality quality-common"></div>
+                        </div>
+                    </div>
+                    <div class="inventory-slot occupied">
+                        <div class="item" draggable="true" data-item="artifact" data-quality="legendary">
+                            <span>💎</span>
+                            <div class="item-quality quality-legendary"></div>
+                        </div>
+                    </div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    
+                    <!-- Row 3-8 (Empty slots) -->
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                    <div class="inventory-slot"></div>
+                </div>
+            </div>
+
+            <!-- Crafting Tab -->
+            <div id="crafting-tab" class="tab-content hidden">
+                <div class="orbitron text-sm font-bold mb-4">AVAILABLE RECIPES</div>
+                <div class="space-y-2">
+                    <div class="crafting-recipe can-craft">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="font-bold">Enhanced Medkit</div>
+                                <div class="text-xs text-gray-400">Medkit + Bandage + Energy Drink</div>
+                            </div>
+                            <div class="text-green-400 text-sm">Craft</div>
+                        </div>
+                    </div>
+                    
+                    <div class="crafting-recipe cannot-craft">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="font-bold">Explosive Pack</div>
+                                <div class="text-xs text-gray-400">Grenade x3 + Battery + Wire</div>
+                            </div>
+                            <div class="text-red-400 text-sm">Missing Items</div>
+                        </div>
+                    </div>
+                    
+                    <div class="crafting-recipe can-craft">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="font-bold">Ammo Pack</div>
+                                <div class="text-xs text-gray-400">5.45x39mm x60 + Gunpowder</div>
+                            </div>
+                            <div class="text-green-400 text-sm">Craft</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Item Details -->
+        <div class="inventory-panel rounded-lg p-4 w-64 fade-in">
+            <div class="orbitron text-lg font-bold mb-4">ITEM DETAILS</div>
+            
+            <div id="item-details">
+                <div class="text-center text-gray-500 py-8">
+                    Select an item to view details
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="mt-6 space-y-2">
+                <button class="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded text-sm transition-colors">
+                    USE ITEM
+                </button>
+                <button class="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded text-sm transition-colors">
+                    DROP ITEM
+                </button>
+                <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded text-sm transition-colors">
+                    EXAMINE
+                </button>
+            </div>
+
+            <!-- Inventory Stats -->
+            <div class="mt-6">
+                <div class="orbitron text-sm font-bold mb-3">INVENTORY STATS</div>
+                <div class="text-xs space-y-2">
+                    <div class="flex justify-between">
+                        <span>Total Items:</span>
+                        <span class="text-green-400">12</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Weight:</span>
+                        <span class="text-yellow-400">18.5/35 kg</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Value:</span>
+                        <span class="text-blue-400">15,750 RU</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Artifacts:</span>
+                        <span class="text-purple-400">1</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="absolute top-4 left-4 fade-in">
+        <button onclick="window.location.href='index.html'" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm transition-colors">
+            ← BACK TO MENU
+        </button>
+    </div>
+
+    <script>
+        let draggedItem = null;
+        let selectedItem = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize animations
+            anime({
+                targets: '.fade-in',
+                opacity: [0, 1],
+                translateY: [20, 0],
+                duration: 1000,
+                delay: anime.stagger(100),
+                easing: 'easeOutQuart'
+            });
+
+            setupDragAndDrop();
+            setupTabs();
+            setupItemSelection();
+            setupCrafting();
+        });
+
+        function setupDragAndDrop() {
+            const items = document.querySelectorAll('.item');
+            const slots = document.querySelectorAll('.inventory-slot, .equipment-slot');
+
+            items.forEach(item => {
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', handleDragEnd);
+            });
+
+            slots.forEach(slot => {
+                slot.addEventListener('dragover', handleDragOver);
+                slot.addEventListener('drop', handleDrop);
+                slot.addEventListener('dragenter', handleDragEnter);
+                slot.addEventListener('dragleave', handleDragLeave);
+            });
+        }
+
+        function handleDragStart(e) {
+            draggedItem = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.outerHTML);
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            draggedItem = null;
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDragEnter(e) {
+            this.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+
+            this.classList.remove('drag-over');
+
+            if (draggedItem) {
+                // Check if slot is equipment slot and validate item type
+                if (this.classList.contains('equipment-slot')) {
+                    const slotType = this.dataset.slot;
+                    const itemType = draggedItem.dataset.item;
+                    
+                    // Simple validation (in real game, this would be more complex)
+                    if (isValidEquipment(slotType, itemType)) {
+                        // Move item to equipment slot
+                        this.appendChild(draggedItem);
+                        this.classList.add('occupied');
+                        
+                        // Remove from original slot
+                        const originalSlot = draggedItem.parentElement;
+                        if (originalSlot.classList.contains('inventory-slot')) {
+                            originalSlot.classList.remove('occupied');
+                        }
+                        
+                        showNotification('ITEM EQUIPPED', `${itemType} equipped to ${slotType}`);
+                    } else {
+                        showNotification('INVALID SLOT', 'This item cannot be equipped here');
+                    }
+                } else {
+                    // Move to inventory slot
+                    this.appendChild(draggedItem);
+                    this.classList.add('occupied');
+                    
+                    // Remove from original slot
+                    const originalSlot = draggedItem.parentElement;
+                    if (originalSlot.classList.contains('equipment-slot')) {
+                        originalSlot.classList.remove('occupied');
+                    } else if (originalSlot.classList.contains('inventory-slot')) {
+                        originalSlot.classList.remove('occupied');
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        function isValidEquipment(slotType, itemType) {
+            const validMappings = {
+                'helmet': ['gas-mask', 'helmet'],
+                'armor': ['tactical-vest', 'armor'],
+                'primary': ['ak74m', 'rifle'],
+                'secondary': ['pistol', 'sidearm'],
+                'tool': ['detector', 'tool']
+            };
+            
+            return validMappings[slotType] && validMappings[slotType].includes(itemType);
+        }
+
+        function setupTabs() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetTab = button.dataset.tab;
+                    
+                    // Update button states
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    // Update content visibility
+                    tabContents.forEach(content => {
+                        if (content.id === `${targetTab}-tab`) {
+                            content.classList.remove('hidden');
+                        } else {
+                            content.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+        }
+
+        function setupItemSelection() {
+            const items = document.querySelectorAll('.item');
+            
+            items.forEach(item => {
+                item.addEventListener('click', () => {
+                    selectItem(item);
+                });
+            });
+        }
+
+        function selectItem(item) {
+            selectedItem = item;
+            
+            // Update item details panel
+            const itemDetails = document.getElementById('item-details');
+            const itemType = item.dataset.item;
+            const itemQuality = item.dataset.quality;
+            const itemCount = item.dataset.count;
+            
+            const itemData = getItemData(itemType);
+            
+            itemDetails.innerHTML = `
+                <div class="text-center mb-4">
+                    <div class="text-4xl mb-2">${itemData.icon}</div>
+                    <div class="orbitron font-bold text-lg">${itemData.name}</div>
+                    <div class="text-sm text-gray-400 capitalize">${itemQuality} Quality</div>
+                    ${itemCount ? `<div class="text-xs text-green-400">Quantity: ${itemCount}</div>` : ''}
+                </div>
+                
+                <div class="text-xs space-y-2">
+                    <div><strong>Type:</strong> ${itemData.type}</div>
+                    <div><strong>Weight:</strong> ${itemData.weight} kg</div>
+                    <div><strong>Value:</strong> ${itemData.value} RU</div>
+                    ${itemData.damage ? `<div><strong>Damage:</strong> ${itemData.damage}</div>` : ''}
+                    ${itemData.protection ? `<div><strong>Protection:</strong> ${itemData.protection}</div>` : ''}
+                    ${itemData.effect ? `<div><strong>Effect:</strong> ${itemData.effect}</div>` : ''}
+                </div>
+                
+                <div class="mt-4 text-xs text-gray-400">
+                    ${itemData.description}
+                </div>
+            `;
+        }
+
+        function getItemData(itemType) {
+            const itemDatabase = {
+                'medkit': {
+                    name: 'Military Medkit',
+                    icon: '🩹',
+                    type: 'Medical',
+                    weight: 0.5,
+                    value: 1500,
+                    effect: 'Restores 50 HP',
+                    description: 'Advanced medical kit used by military forces. Contains antibiotics, painkillers, and bandages.'
+                },
+                'bandage': {
+                    name: 'Bandage',
+                    icon: '🩹',
+                    type: 'Medical',
+                    weight: 0.1,
+                    value: 200,
+                    effect: 'Stops bleeding',
+                    description: 'Basic medical bandage for treating wounds.'
+                },
+                'ammo-545': {
+                    name: '5.45x39mm Ammo',
+                    icon: '🎯',
+                    type: 'Ammunition',
+                    weight: 0.02,
+                    value: 50,
+                    description: 'Soviet intermediate cartridge. Used in AK-74 series rifles.'
+                },
+                'grenade': {
+                    name: 'RGD-5 Grenade',
+                    icon: '💣',
+                    type: 'Explosive',
+                    weight: 0.3,
+                    value: 800,
+                    damage: 'High Explosive',
+                    description: 'Soviet fragmentation grenade with 3-4 second fuse.'
+                },
+                'energy-drink': {
+                    name: 'Energy Drink',
+                    icon: '🧃',
+                    type: 'Consumable',
+                    weight: 0.3,
+                    value: 300,
+                    effect: 'Restores stamina',
+                    description: 'Caffeinated beverage that temporarily boosts endurance.'
+                },
+                'battery': {
+                    name: 'Battery',
+                    icon: '🔋',
+                    type: 'Component',
+                    weight: 0.2,
+                    value: 150,
+                    description: 'Standard battery for electronic devices and tools.'
+                },
+                'artifact': {
+                    name: 'Moonlight Artifact',
+                    icon: '💎',
+                    type: 'Artifact',
+                    weight: 0.5,
+                    value: 15000,
+                    effect: '+20% Radiation Resistance',
+                    description: 'Rare anomaly artifact that glows with ethereal light. Highly valuable.'
+                }
+            };
+            
+            return itemDatabase[itemType] || {
+                name: 'Unknown Item',
+                icon: '❓',
+                type: 'Unknown',
+                weight: 0,
+                value: 0,
+                description: 'Unknown item type'
+            };
+        }
+
+        function setupCrafting() {
+            const recipes = document.querySelectorAll('.crafting-recipe');
+            recipes.forEach(recipe => {
+                recipe.addEventListener('click', () => {
+                    if (recipe.classList.contains('can-craft')) {
+                        showNotification('CRAFTING SUCCESS', 'Item crafted successfully');
+                        // In real game, this would consume resources and add crafted item
+                    } else {
+                        showNotification('CANNOT CRAFT', 'Missing required materials');
+                    }
+                });
+            });
+        }
+
+        function showNotification(title, message) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-black border-l-4 border-green-500 p-4 text-white z-50 transform translate-x-full transition-transform duration-300';
+            notification.innerHTML = `
+                <div class="font-bold text-green-400">${title}</div>
+                <div class="text-sm text-gray-400">${message}</div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Show notification
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+            }, 100);
+            
+            // Hide notification
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
